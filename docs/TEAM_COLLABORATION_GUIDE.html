@@ -1,0 +1,1245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SmartLeaseEdge Team Collaboration Guide</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap">
+<style>
+  @page {
+    size: A4;
+    margin: 15mm 12mm;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  :root {
+    --ground: #ffffff;
+    --text: #1a1a1a;
+    --text-muted: #5a5a5a;
+    --accent: #2d1a63;
+    --accent-light: #3a2472;
+    --secondary: #f5a623;
+    --code-bg: #f4f6f8;
+    --code-border: #e1e8ed;
+    --divider: #e5e5e5;
+    --success: #2e9e5b;
+    --warning: #f5a623;
+    --danger: #d64545;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0f0f0f;
+      --text: #e8e8e8;
+      --text-muted: #a0a0a0;
+      --code-bg: #1a1a1a;
+      --code-border: #2a2a2a;
+      --divider: #2a2a2a;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #0f0f0f;
+    --text: #e8e8e8;
+    --text-muted: #a0a0a0;
+    --code-bg: #1a1a1a;
+    --code-border: #2a2a2a;
+    --divider: #2a2a2a;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 10pt;
+    line-height: 1.6;
+    color: var(--text);
+    background: var(--ground);
+    max-width: 210mm;
+    margin: 0 auto;
+    padding: 0;
+  }
+
+  .cover {
+    height: 280mm;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 40mm 20mm;
+    background: linear-gradient(160deg, var(--accent) 0%, var(--accent-light) 100%);
+    color: #ffffff;
+    page-break-after: always;
+    margin: -15mm -12mm 0 -12mm;
+  }
+
+  .cover h1 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 32pt;
+    font-weight: 700;
+    line-height: 1.1;
+    margin-bottom: 8mm;
+    text-wrap: balance;
+  }
+
+  .cover .subtitle {
+    font-size: 13pt;
+    line-height: 1.5;
+    color: rgba(255,255,255,0.9);
+    max-width: 140mm;
+    margin-bottom: 12mm;
+  }
+
+  .cover .meta {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6mm;
+    margin-top: auto;
+    padding-top: 12mm;
+    border-top: 1px solid rgba(255,255,255,0.2);
+  }
+
+  .cover .meta-item {
+    font-size: 9pt;
+  }
+
+  .cover .meta-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 7.5pt;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: rgba(255,255,255,0.6);
+    margin-bottom: 2mm;
+  }
+
+  .cover .meta-value {
+    font-weight: 500;
+    color: #ffffff;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    text-wrap: balance;
+  }
+
+  h1 {
+    font-size: 20pt;
+    color: var(--accent);
+    margin: 12mm 0 6mm 0;
+    page-break-after: avoid;
+  }
+
+  h2 {
+    font-size: 14pt;
+    color: var(--accent);
+    margin: 8mm 0 4mm 0;
+    padding-bottom: 2mm;
+    border-bottom: 2px solid var(--secondary);
+    page-break-after: avoid;
+  }
+
+  h2.section-break {
+    page-break-before: always;
+    margin-top: 0;
+  }
+
+  h3 {
+    font-size: 11pt;
+    color: var(--accent-light);
+    margin: 6mm 0 3mm 0;
+    page-break-after: avoid;
+  }
+
+  h4 {
+    font-size: 10pt;
+    font-weight: 600;
+    color: var(--text);
+    margin: 4mm 0 2mm 0;
+  }
+
+  p {
+    margin: 0 0 3mm 0;
+  }
+
+  strong {
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  em {
+    font-style: italic;
+    color: var(--accent-light);
+  }
+
+  code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9pt;
+    background: var(--code-bg);
+    padding: 1px 4px;
+    border-radius: 2px;
+    color: var(--accent-light);
+    font-variant-numeric: tabular-nums;
+  }
+
+  pre {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8.5pt;
+    line-height: 1.5;
+    background: var(--code-bg);
+    border: 1px solid var(--code-border);
+    border-left: 3px solid var(--accent);
+    padding: 4mm;
+    margin: 3mm 0;
+    overflow-x: auto;
+    border-radius: 2px;
+    page-break-inside: avoid;
+    font-variant-numeric: tabular-nums;
+  }
+
+  pre code {
+    background: none;
+    padding: 0;
+    color: var(--text);
+  }
+
+  .command {
+    background: var(--accent);
+    color: #ffffff;
+    padding: 3mm 4mm;
+    border-radius: 2px;
+    margin: 3mm 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9pt;
+    page-break-inside: avoid;
+  }
+
+  .command::before {
+    content: "$";
+    opacity: 0.6;
+    margin-right: 4mm;
+  }
+
+  ul, ol {
+    margin: 3mm 0 3mm 6mm;
+    padding: 0;
+  }
+
+  li {
+    margin: 2mm 0;
+    padding-left: 2mm;
+  }
+
+  ul ul, ol ol {
+    margin: 2mm 0 2mm 4mm;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 4mm 0;
+    font-size: 9pt;
+    page-break-inside: avoid;
+  }
+
+  th {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8pt;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    background: var(--accent);
+    color: #ffffff;
+    padding: 3mm;
+    text-align: left;
+    border-bottom: 2px solid var(--accent-light);
+  }
+
+  td {
+    padding: 3mm;
+    border-bottom: 1px solid var(--divider);
+    vertical-align: top;
+  }
+
+  tr:nth-child(even) td {
+    background: rgba(0,0,0,0.02);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    tr:nth-child(even) td {
+      background: rgba(255,255,255,0.03);
+    }
+  }
+
+  .callout {
+    padding: 4mm;
+    margin: 4mm 0;
+    border-left: 3px solid var(--secondary);
+    background: rgba(245, 166, 35, 0.08);
+    page-break-inside: avoid;
+    font-size: 9.5pt;
+  }
+
+  .callout.success {
+    border-left-color: var(--success);
+    background: rgba(46, 158, 91, 0.08);
+  }
+
+  .callout.danger {
+    border-left-color: var(--danger);
+    background: rgba(214, 69, 69, 0.08);
+  }
+
+  .workflow-step {
+    display: grid;
+    grid-template-columns: 12mm 1fr;
+    gap: 4mm;
+    margin: 4mm 0;
+    page-break-inside: avoid;
+  }
+
+  .step-number {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 16pt;
+    font-weight: 700;
+    color: var(--accent);
+    text-align: right;
+    line-height: 1;
+  }
+
+  .step-content h4 {
+    margin-top: 0;
+  }
+
+  .badge {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 7.5pt;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    padding: 1mm 3mm;
+    border-radius: 2px;
+    margin-right: 2mm;
+  }
+
+  .badge.success {
+    background: var(--success);
+    color: #ffffff;
+  }
+
+  .badge.warning {
+    background: var(--warning);
+    color: #ffffff;
+  }
+
+  .badge.danger {
+    background: var(--danger);
+    color: #ffffff;
+  }
+
+  .toc {
+    margin: 6mm 0;
+    padding: 4mm;
+    background: rgba(0,0,0,0.02);
+    border-radius: 2px;
+  }
+
+  .toc h3 {
+    margin-top: 0;
+    font-size: 10pt;
+  }
+
+  .toc ul {
+    list-style: none;
+    margin: 3mm 0 0 0;
+  }
+
+  .toc li {
+    padding: 1mm 0;
+    font-size: 9pt;
+  }
+
+  .toc a {
+    color: var(--text);
+    text-decoration: none;
+  }
+
+  .toc a:hover {
+    color: var(--accent);
+  }
+
+  .checklist {
+    list-style: none;
+    margin: 3mm 0;
+  }
+
+  .checklist li {
+    padding-left: 6mm;
+    position: relative;
+  }
+
+  .checklist li::before {
+    content: "☐";
+    position: absolute;
+    left: 0;
+    font-size: 11pt;
+    color: var(--accent);
+  }
+
+  .footer {
+    margin-top: 8mm;
+    padding-top: 4mm;
+    border-top: 1px solid var(--divider);
+    font-size: 8pt;
+    color: var(--text-muted);
+    text-align: center;
+  }
+
+  @media print {
+    body {
+      max-width: none;
+    }
+
+    a {
+      color: var(--text);
+      text-decoration: none;
+    }
+
+    a::after {
+      content: " (" attr(href) ")";
+      font-size: 8pt;
+      color: var(--text-muted);
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <h1>SmartLeaseEdge<br>Team Collaboration Guide</h1>
+  <p class="subtitle">GitHub workflow and contribution guidelines for parallel development — designed for the iQOO Hackathon 2026 Chennai City Battle sprint.</p>
+
+  <div class="meta">
+    <div class="meta-item">
+      <div class="meta-label">Timeline</div>
+      <div class="meta-value">12-day prep + 2-day event</div>
+    </div>
+    <div class="meta-item">
+      <div class="meta-label">Team</div>
+      <div class="meta-value">3 members (AI, Android, Research)</div>
+    </div>
+    <div class="meta-item">
+      <div class="meta-label">Repository</div>
+      <div class="meta-value">smartlease-edge-chennai</div>
+    </div>
+    <div class="meta-item">
+      <div class="meta-label">Event</div>
+      <div class="meta-value">Sep 12–13, 2026</div>
+    </div>
+  </div>
+</div>
+
+<h1>Part 1: GitHub Workflow</h1>
+
+<h2>Branch Structure</h2>
+
+<pre><code>master (always stable, demo-ready)
+  ├── feature/ai-models      (Member 1: AI/NPU Engineer)
+  ├── feature/android-ui     (Member 2: Android Developer)
+  └── feature/docs-demo      (Member 3: Research & Demo)</code></pre>
+
+<h3>Branch Naming Convention</h3>
+
+<table>
+<tr>
+  <th>Prefix</th>
+  <th>Usage</th>
+  <th>Example</th>
+</tr>
+<tr>
+  <td><code>feature/</code></td>
+  <td>New features</td>
+  <td><code>feature/acoustic-classifier</code></td>
+</tr>
+<tr>
+  <td><code>fix/</code></td>
+  <td>Bug fixes</td>
+  <td><code>fix/camera-crash</code></td>
+</tr>
+<tr>
+  <td><code>docs/</code></td>
+  <td>Documentation only</td>
+  <td><code>docs/demo-script</code></td>
+</tr>
+<tr>
+  <td><code>test/</code></td>
+  <td>Testing improvements</td>
+  <td><code>test/acoustic-validation</code></td>
+</tr>
+</table>
+
+<h2 class="section-break">Initial Setup</h2>
+
+<div class="workflow-step">
+  <div class="step-number">1</div>
+  <div class="step-content">
+    <h4>Clone the Repository</h4>
+    <div class="command">git clone https://github.com/muhammedsayeedurrahman/smartlease-edge-chennai.git</div>
+    <div class="command">cd smartlease-edge-chennai</div>
+  </div>
+</div>
+
+<div class="workflow-step">
+  <div class="step-number">2</div>
+  <div class="step-content">
+    <h4>Set Up Git Identity</h4>
+    <p>Each team member runs on their machine:</p>
+    <div class="command">git config user.name "Your Name"</div>
+    <div class="command">git config user.email "your.email@example.com"</div>
+  </div>
+</div>
+
+<div class="workflow-step">
+  <div class="step-number">3</div>
+  <div class="step-content">
+    <h4>Create Your Feature Branch</h4>
+    <p><strong>Member 1 (AI/NPU):</strong></p>
+    <div class="command">git checkout -b feature/ai-models</div>
+    <div class="command">git push -u origin feature/ai-models</div>
+
+    <p><strong>Member 2 (Android):</strong></p>
+    <div class="command">git checkout -b feature/android-ui</div>
+    <div class="command">git push -u origin feature/android-ui</div>
+
+    <p><strong>Member 3 (Research):</strong></p>
+    <div class="command">git checkout -b feature/docs-demo</div>
+    <div class="command">git push -u origin feature/docs-demo</div>
+  </div>
+</div>
+
+<h2 class="section-break">Daily Workflow</h2>
+
+<h3>Every Morning: Sync with Master</h3>
+
+<pre><code># 1. Switch to your branch
+git checkout feature/your-branch-name
+
+# 2. Get latest changes from master
+git fetch origin
+git merge origin/master
+
+# 3. Resolve conflicts if any (see Conflict Resolution section)</code></pre>
+
+<h3>During the Day: Make Commits</h3>
+
+<pre><code># 1. Check what changed
+git status
+
+# 2. Add files to commit
+git add path/to/file.kt
+# OR add all changed files
+git add .
+
+# 3. Commit with clear message
+git commit -m "feat: add AR overlay rendering
+
+- Implemented SensorManager rotation tracking
+- Added pitch/roll delta visualization
+- Ghost image opacity adjusts based on alignment
+
+Related: #5"
+
+# 4. Push to your branch
+git push</code></pre>
+
+<h3>End of Day: Push Your Work</h3>
+
+<div class="command">git push origin feature/your-branch-name</div>
+
+<p><strong>Always push before leaving for the day</strong> — backs up your work and lets teammates see progress.</p>
+
+<h2 class="section-break">Commit Message Format</h2>
+
+<p>Use <strong>Conventional Commits</strong> format:</p>
+
+<pre><code>&lt;type&gt;: &lt;short description&gt;
+
+&lt;optional body&gt;
+
+&lt;optional footer&gt;</code></pre>
+
+<h3>Commit Types</h3>
+
+<table>
+<tr>
+  <th>Type</th>
+  <th>Usage</th>
+</tr>
+<tr>
+  <td><code>feat:</code></td>
+  <td>New feature</td>
+</tr>
+<tr>
+  <td><code>fix:</code></td>
+  <td>Bug fix</td>
+</tr>
+<tr>
+  <td><code>docs:</code></td>
+  <td>Documentation only</td>
+</tr>
+<tr>
+  <td><code>test:</code></td>
+  <td>Adding/updating tests</td>
+</tr>
+<tr>
+  <td><code>refactor:</code></td>
+  <td>Code restructure (no behavior change)</td>
+</tr>
+<tr>
+  <td><code>chore:</code></td>
+  <td>Build, dependencies, config</td>
+</tr>
+</table>
+
+<h3>Good Examples</h3>
+
+<div class="callout success">
+<code>feat: add acoustic tap classifier integration</code><br>
+<code>fix: camera preview crash on rotation</code><br>
+<code>docs: update README with team structure</code><br>
+<code>test: add unit tests for IR controller</code>
+</div>
+
+<h3>Bad Examples (Avoid)</h3>
+
+<div class="callout danger">
+<code>updates</code><br>
+<code>fix stuff</code><br>
+<code>WIP</code><br>
+<code>changes</code>
+</div>
+
+<h2 class="section-break">Merging Your Work Into Master</h2>
+
+<h3>Option A: Pull Request (Recommended)</h3>
+
+<p><span class="badge success">Best for</span> Completed features, want code review</p>
+
+<div class="workflow-step">
+  <div class="step-number">1</div>
+  <div class="step-content">
+    <h4>Push your branch</h4>
+    <div class="command">git push origin feature/your-branch-name</div>
+  </div>
+</div>
+
+<div class="workflow-step">
+  <div class="step-number">2</div>
+  <div class="step-content">
+    <h4>Create Pull Request on GitHub</h4>
+    <ul>
+      <li>Go to: <code>github.com/muhammedsayeedurrahman/smartlease-edge-chennai</code></li>
+      <li>Click "Pull requests" → "New pull request"</li>
+      <li>Base: <code>master</code> ← Compare: <code>feature/your-branch-name</code></li>
+      <li>Write clear title and description</li>
+    </ul>
+  </div>
+</div>
+
+<div class="workflow-step">
+  <div class="step-number">3</div>
+  <div class="step-content">
+    <h4>Request review from teammates</h4>
+    <ul>
+      <li>Assign reviewers: Member 2 and/or Member 3</li>
+      <li>Wait for approval or address feedback</li>
+    </ul>
+  </div>
+</div>
+
+<div class="workflow-step">
+  <div class="step-number">4</div>
+  <div class="step-content">
+    <h4>Merge when approved</h4>
+    <ul>
+      <li>Click "Merge pull request"</li>
+      <li>Optionally delete branch after merge</li>
+    </ul>
+  </div>
+</div>
+
+<h3>Option B: Direct Merge (Fast, but risky)</h3>
+
+<p><span class="badge warning">Use for</span> Small changes, docs only, urgent fixes</p>
+
+<div class="callout danger">
+<strong>Warning:</strong> Only do this if you're confident there are no conflicts. For major features, use Pull Requests.
+</div>
+
+<pre><code># 1. Switch to master
+git checkout master
+
+# 2. Pull latest changes
+git pull origin master
+
+# 3. Merge your branch
+git merge feature/your-branch-name
+
+# 4. Push to master
+git push origin master
+
+# 5. Go back to your branch
+git checkout feature/your-branch-name</code></pre>
+
+<h2 class="section-break">Conflict Resolution</h2>
+
+<h3>When do conflicts happen?</h3>
+
+<ul>
+  <li>Two people edited the same file, same lines</li>
+  <li>You try to merge master into your branch, or merge your branch into master</li>
+</ul>
+
+<h3>Example Conflict</h3>
+
+<pre><code><<<<<<< HEAD (your changes)
+val threshold = 0.8f
+=======
+val threshold = 0.75f
+>>>>>>> origin/master (their changes)</code></pre>
+
+<h3>How to Resolve</h3>
+
+<div class="workflow-step">
+  <div class="step-number">1</div>
+  <div class="step-content">
+    <p>Open the file in your editor</p>
+  </div>
+</div>
+
+<div class="workflow-step">
+  <div class="step-number">2</div>
+  <div class="step-content">
+    <p>Decide which version to keep (or combine both)</p>
+    <pre><code>// Keep yours
+val threshold = 0.8f
+
+// OR keep theirs
+val threshold = 0.75f
+
+// OR combine
+val threshold = 0.8f // Updated from 0.75 after testing</code></pre>
+  </div>
+</div>
+
+<div class="workflow-step">
+  <div class="step-number">3</div>
+  <div class="step-content">
+    <p>Remove conflict markers (<code>&lt;&lt;&lt;&lt;&lt;&lt;&lt;</code>, <code>=======</code>, <code>&gt;&gt;&gt;&gt;&gt;&gt;&gt;</code>)</p>
+  </div>
+</div>
+
+<div class="workflow-step">
+  <div class="step-number">4</div>
+  <div class="step-content">
+    <p>Stage and commit</p>
+    <div class="command">git add path/to/file.kt</div>
+    <div class="command">git commit -m "fix: resolve threshold conflict, keep higher value"</div>
+    <div class="command">git push</div>
+  </div>
+</div>
+
+<div class="callout">
+<strong>If unsure:</strong> Ask in group chat before resolving. It's better to clarify than to accidentally delete someone's work.
+</div>
+
+<h2 class="section-break">Avoiding Conflicts</h2>
+
+<h3>1. File Ownership</h3>
+
+<table>
+<tr>
+  <th>Owner</th>
+  <th>Files</th>
+</tr>
+<tr>
+  <td>Member 1 (AI)</td>
+  <td><code>training_data/</code>, <code>models/</code>, ML scripts</td>
+</tr>
+<tr>
+  <td>Member 2 (Android)</td>
+  <td><code>app/src/main/java/.../ui/</code>, Android code</td>
+</tr>
+<tr>
+  <td>Member 3 (Research)</td>
+  <td><code>docs/</code>, demo materials</td>
+</tr>
+<tr>
+  <td>Shared (coordinate)</td>
+  <td><code>README.md</code>, database schema</td>
+</tr>
+</table>
+
+<p><strong>Rule:</strong> Don't edit files you don't own without coordinating first.</p>
+
+<h3>2. Pull Before You Start</h3>
+
+<div class="command">git checkout your-branch && git pull origin master</div>
+
+<p>Do this every morning before writing code.</p>
+
+<h3>3. Push Frequently</h3>
+
+<div class="command">git push</div>
+
+<p>At least once per day, preferably more. Small, frequent pushes are easier to merge.</p>
+
+<h3>4. Small, Focused Commits</h3>
+
+<div class="callout success">
+<strong>Good:</strong><br>
+<code>feat: add tap sound recording UI</code><br>
+<code>feat: add file save functionality</code><br>
+<code>feat: add playback preview</code>
+</div>
+
+<div class="callout danger">
+<strong>Bad:</strong><br>
+<code>feat: entire acoustic recording feature (500 lines changed)</code>
+</div>
+
+<p>Smaller commits = easier to merge, easier to review.</p>
+
+<h2 class="section-break">Emergency Scenarios</h2>
+
+<h3>Scenario 1: "I broke master!"</h3>
+
+<p><strong>Fix:</strong></p>
+
+<pre><code># Option 1: Revert the bad commit
+git checkout master
+git log  # Find the bad commit hash (e.g., abc123)
+git revert abc123
+git push origin master
+
+# Option 2: Reset to last good commit (DANGEROUS)
+git checkout master
+git reset --hard &lt;last-good-commit-hash&gt;
+git push origin master --force  # ⚠️ Only if no one else has pulled!</code></pre>
+
+<p><strong>Prevention:</strong> Always test before merging to master.</p>
+
+<h3>Scenario 2: "I need to undo my last commit"</h3>
+
+<pre><code># If you haven't pushed yet:
+git reset --soft HEAD~1  # Keeps changes, undoes commit
+# OR
+git reset --hard HEAD~1  # Deletes changes, undoes commit
+
+# If you already pushed:
+git revert HEAD  # Creates a new commit that undoes the last one
+git push</code></pre>
+
+<h3>Scenario 3: "I committed to master instead of my branch"</h3>
+
+<pre><code># 1. Create a branch from current state
+git branch feature/oops
+
+# 2. Reset master to before your commits
+git checkout master
+git reset --hard origin/master
+
+# 3. Switch to your branch and continue
+git checkout feature/oops</code></pre>
+
+<h2 class="section-break">Quick Command Reference</h2>
+
+<table>
+<tr>
+  <th>Task</th>
+  <th>Command</th>
+</tr>
+<tr>
+  <td>Clone repo</td>
+  <td><code>git clone &lt;url&gt;</code></td>
+</tr>
+<tr>
+  <td>Create branch</td>
+  <td><code>git checkout -b feature/name</code></td>
+</tr>
+<tr>
+  <td>Sync with master</td>
+  <td><code>git pull origin master</code></td>
+</tr>
+<tr>
+  <td>Stage changes</td>
+  <td><code>git add .</code></td>
+</tr>
+<tr>
+  <td>Commit</td>
+  <td><code>git commit -m "feat: ..."</code></td>
+</tr>
+<tr>
+  <td>Push</td>
+  <td><code>git push</code></td>
+</tr>
+<tr>
+  <td>Check status</td>
+  <td><code>git status</code></td>
+</tr>
+<tr>
+  <td>View log</td>
+  <td><code>git log --oneline -5</code></td>
+</tr>
+<tr>
+  <td>View diff</td>
+  <td><code>git diff</code></td>
+</tr>
+<tr>
+  <td>Undo last commit (keep changes)</td>
+  <td><code>git reset --soft HEAD~1</code></td>
+</tr>
+</table>
+
+<h1 class="section-break">Part 2: Contributing Guidelines</h1>
+
+<h2>Code Style Guidelines</h2>
+
+<h3>Kotlin (Android Code)</h3>
+
+<div class="callout success">
+<strong>✅ Good — Clear naming, immutable</strong>
+<pre><code>data class InspectionResult(
+    val defectArea: Float,
+    val acousticVerdict: Boolean,
+    val irFunctional: Boolean
+)
+
+fun calculateDefectArea(segments: List&lt;Segment&gt;): Float {
+    return segments
+        .filter { it.isDefect }
+        .sumOf { it.area }
+        .toFloat()
+}</code></pre>
+</div>
+
+<div class="callout danger">
+<strong>❌ Bad — Mutable, unclear naming</strong>
+<pre><code>var result = 0f
+fun calc(s: List&lt;Segment&gt;): Float {
+    for (seg in s) {
+        if (seg.isDefect) {
+            result += seg.area
+        }
+    }
+    return result
+}</code></pre>
+</div>
+
+<h4>Key Principles</h4>
+
+<ul class="checklist">
+  <li>Use <code>val</code> (immutable) by default, <code>var</code> only when necessary</li>
+  <li>Prefer <code>data class</code> for DTOs</li>
+  <li>Use meaningful names (<code>defectArea</code> not <code>da</code>)</li>
+  <li>Keep functions small (&lt;50 lines)</li>
+  <li>Extract magic numbers to constants</li>
+</ul>
+
+<h4>Formatting</h4>
+
+<ul>
+  <li>4 spaces indentation (not tabs)</li>
+  <li>Max line length: 120 characters</li>
+  <li>Opening brace on same line: <code>fun foo() {</code></li>
+</ul>
+
+<h3>Python (ML/Training Scripts)</h3>
+
+<div class="callout success">
+<strong>✅ Good — Type hints, clear structure</strong>
+<pre><code>from pathlib import Path
+from typing import List, Tuple
+
+def load_audio_samples(
+    data_dir: Path,
+    sample_rate: int = 44100
+) -> Tuple[List[np.ndarray], List[int]]:
+    """Load acoustic tap samples.
+
+    Args:
+        data_dir: Path to hollow/solid directories
+        sample_rate: Target sample rate in Hz
+
+    Returns:
+        Tuple of (audio_arrays, labels)
+    """
+    samples = []
+    labels = []
+
+    for class_dir in data_dir.iterdir():
+        label = 1 if class_dir.name == "hollow" else 0
+        for audio_file in class_dir.glob("*.wav"):
+            samples.append(load_wav(audio_file, sample_rate))
+            labels.append(label)
+
+    return samples, labels</code></pre>
+</div>
+
+<h4>Key Principles</h4>
+
+<ul class="checklist">
+  <li>Always use type hints (<code>def func(x: int) -> str:</code>)</li>
+  <li>Write docstrings for all functions</li>
+  <li>Use <code>pathlib.Path</code> not string paths</li>
+  <li>Prefer list comprehensions when readable</li>
+  <li>Constants in UPPER_CASE</li>
+</ul>
+
+<h4>Formatting</h4>
+
+<ul>
+  <li>Run <code>black</code> before committing: <code>black scripts/</code></li>
+  <li>Max line length: 88 characters (black default)</li>
+</ul>
+
+<h3>Markdown (Documentation)</h3>
+
+<div class="callout">
+<strong>Clear structure:</strong>
+<pre><code># Main Title (H1 - only one per file)
+
+Brief intro paragraph.
+
+## Section (H2)
+
+Content here.
+
+### Subsection (H3)
+
+More content.
+
+**Bold** for emphasis
+*Italic* for terms
+`code` for inline code</code></pre>
+</div>
+
+<h2 class="section-break">Before You Commit</h2>
+
+<h3>Self-Review Checklist</h3>
+
+<ul class="checklist">
+  <li>Code compiles/runs without errors</li>
+  <li>No <code>TODO</code> or <code>FIXME</code> comments (create an issue instead)</li>
+  <li>No hardcoded values (use constants or config)</li>
+  <li>No console.log / println (use proper logging)</li>
+  <li>No commented-out code (delete it, Git keeps history)</li>
+  <li>File names follow convention (PascalCase for classes, kebab-case for docs)</li>
+</ul>
+
+<h3>Test Your Changes</h3>
+
+<p><strong>Android (Member 2):</strong></p>
+
+<div class="command">./gradlew :app:assembleDebug</div>
+
+<p>Build succeeds → Run on device → Verify in airplane mode</p>
+
+<p><strong>Python (Member 1):</strong></p>
+
+<div class="command">python scripts/train_acoustic_classifier.py</div>
+
+<p>Script runs without errors → If tests exist, run them: <code>pytest tests/</code></p>
+
+<p><strong>Documentation (Member 3):</strong></p>
+
+<ul>
+  <li>Read through your doc — does it make sense?</li>
+  <li>Check all links work</li>
+  <li>Spell-check</li>
+</ul>
+
+<h2 class="section-break">Code Review Process</h2>
+
+<h3>When to Request Review</h3>
+
+<p><span class="badge danger">Always</span> request review for:</p>
+
+<ul>
+  <li>Merging to master</li>
+  <li>Large features (&gt;200 lines changed)</li>
+  <li>Changes to shared files (database schema, core models)</li>
+  <li>Anything you're unsure about</li>
+</ul>
+
+<p><span class="badge success">Optional</span> (but encouraged) for:</p>
+
+<ul>
+  <li>Small bug fixes</li>
+  <li>Documentation updates</li>
+  <li>Your own feature branch work</li>
+</ul>
+
+<h3>How to Review Code</h3>
+
+<div class="workflow-step">
+  <div class="step-number">1</div>
+  <div class="step-content">
+    <h4>Pull their branch</h4>
+    <div class="command">git fetch origin && git checkout feature/their-branch</div>
+  </div>
+</div>
+
+<div class="workflow-step">
+  <div class="step-number">2</div>
+  <div class="step-content">
+    <h4>Test it</h4>
+    <ul>
+      <li>Build and run the code</li>
+      <li>Try to break it (edge cases)</li>
+      <li>Check airplane mode works</li>
+    </ul>
+  </div>
+</div>
+
+<div class="workflow-step">
+  <div class="step-number">3</div>
+  <div class="step-content">
+    <h4>Read the code</h4>
+    <ul>
+      <li>Is it readable?</li>
+      <li>Does it follow our style guide?</li>
+      <li>Are there obvious bugs?</li>
+      <li>Is it too complex?</li>
+    </ul>
+  </div>
+</div>
+
+<div class="workflow-step">
+  <div class="step-number">4</div>
+  <div class="step-content">
+    <h4>Leave feedback</h4>
+    <ul>
+      <li><strong>Approve</strong> if looks good</li>
+      <li><strong>Request changes</strong> if issues found</li>
+      <li><strong>Comment</strong> for questions/suggestions</li>
+    </ul>
+  </div>
+</div>
+
+<h3>Good Feedback Examples</h3>
+
+<div class="callout success">
+"Consider extracting this 50-line function into smaller helpers for readability."<br><br>
+"This looks good! One suggestion: move this magic number (0.85) to a constant."<br><br>
+"Minor: variable name <code>d</code> is unclear - maybe <code>defectArea</code>?"
+</div>
+
+<h3>Unhelpful Feedback Examples</h3>
+
+<div class="callout danger">
+"This is bad."<br><br>
+"Rewrite this."<br><br>
+"I don't like this approach." (without explaining why)
+</div>
+
+<h3>Review Response Time</h3>
+
+<table>
+<tr>
+  <th>Priority</th>
+  <th>Response Time</th>
+</tr>
+<tr>
+  <td>Urgent (blockers)</td>
+  <td>&lt;2 hours</td>
+</tr>
+<tr>
+  <td>Normal PRs</td>
+  <td>&lt;24 hours</td>
+</tr>
+<tr>
+  <td>Documentation</td>
+  <td>&lt;48 hours</td>
+</tr>
+</table>
+
+<p>If you can't review soon, comment: "I'll review this tomorrow morning"</p>
+
+<h2 class="section-break">Things to Avoid</h2>
+
+<h3>Don't Commit</h3>
+
+<ul class="checklist">
+  <li>Secrets (API keys, passwords) → Use environment variables</li>
+  <li>Large binaries (&gt;10MB) → Use Git LFS or external storage</li>
+  <li>Build artifacts (<code>*.apk</code>, <code>*.class</code>, <code>__pycache__</code>)</li>
+  <li>Personal IDE settings (keep only <code>.idea/runConfigurations</code>)</li>
+  <li>Temporary files (<code>*.tmp</code>, <code>*.swp</code>, <code>.DS_Store</code>)</li>
+</ul>
+
+<p><strong>Check:</strong> <code>.gitignore</code> is configured correctly</p>
+
+<h3>Don't Push</h3>
+
+<ul class="checklist">
+  <li>Code that doesn't compile</li>
+  <li>Code that crashes on launch</li>
+  <li>Incomplete features (use feature flags if needed)</li>
+  <li>Commented-out code</li>
+</ul>
+
+<p><strong>Rule:</strong> Push "work in progress" to your branch, but not to master</p>
+
+<h3>Don't Merge to Master</h3>
+
+<ul class="checklist">
+  <li>Without testing</li>
+  <li>Without code review (unless docs-only or trivial)</li>
+  <li>If CI/CD fails (when we set it up)</li>
+  <li>During teammate's critical work period</li>
+</ul>
+
+<p><strong>Coordinate:</strong> in group chat before merging</p>
+
+<h2 class="section-break">Daily Team Sync</h2>
+
+<p><strong>Format:</strong> Quick standup via chat or call (15 minutes, end of day)</p>
+
+<p><strong>Each member reports:</strong></p>
+
+<ol>
+  <li>What I completed today</li>
+  <li>What I'm working on tomorrow</li>
+  <li>Blockers / dependencies on other members</li>
+</ol>
+
+<h3>Example</h3>
+
+<div class="callout">
+<strong>Member 1 (AI):</strong><br>
+✅ Trained acoustic classifier (92% accuracy)<br>
+→ Tomorrow: Start YOLOv8 training<br>
+⚠️ Need: Sample test images from Member 3<br><br>
+
+<strong>Member 2 (Android):</strong><br>
+✅ Implemented AR overlay UI<br>
+→ Tomorrow: IR code pre-capture<br>
+⚠️ Need: Acoustic model from Member 1 by Day 8<br><br>
+
+<strong>Member 3 (Research):</strong><br>
+✅ Collected 50 acoustic samples<br>
+→ Tomorrow: Download vision datasets<br>
+⚠️ None
+</div>
+
+<div class="footer">
+  SmartLeaseEdge Team Collaboration Guide — iQOO Hackathon 2026 Chennai City Battle<br>
+  Repository: github.com/muhammedsayeedurrahman/smartlease-edge-chennai
+</div>
+
+</body>
+</html>
