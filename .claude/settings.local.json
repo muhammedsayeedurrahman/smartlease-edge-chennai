@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git init *)"
+      "Bash(git init *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git commit -m 'docs: add GitHub repository link to README *)"
     ]
   }
 }

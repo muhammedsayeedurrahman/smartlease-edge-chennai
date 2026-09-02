@@ -1,32 +1,31 @@
 #!/usr/bin/env python3
 """
-SmartLease Edge — Automated Dataset Downloader
-Downloads public wall damage datasets from common sources.
+SmartLeaseEdge — Automated Dataset Downloader
+Downloads pre-annotated wall damage datasets from public sources.
 
 Usage:
-    python download_datasets.py
+    python download_datasets.py --all
+    python download_datasets.py --roboflow
+    python download_datasets.py --kaggle
+    python download_datasets.py --list
+    python download_datasets.py --manual
 
 Requirements:
-    pip install requests beautifulsoup4 kaggle roboflow rich
-
-    For Kaggle:
-        1. Create ~/.kaggle/kaggle.json with API credentials
-        2. Get API key from kaggle.com/[username]/account
+    pip install roboflow kaggle requests rich
 """
 
 import os
-import sys
+import argparse
 from pathlib import Path
-import subprocess
 from rich.console import Console
-from rich.prompt import Confirm, Prompt
+from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.panel import Panel
-from rich.progress import Progress
+from rich import print as rprint
 
 console = Console()
 
-DATASETS_DIR = Path(__file__).parent / "training_data" / "vision" / "datasets"
-DATASETS_DIR.mkdir(parents=True, exist_ok=True)
+BASE_DIR = Path(__file__).parent / "training_data" / "vision" / "datasets"
+BASE_DIR.mkdir(parents=True, exist_ok=True)
 
 def check_dependencies():
     """Check if required packages are installed."""
