@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Camera: AR alignment + vision segmentation + OCR input -->
+    <uses-feature android:name="android.hardware.camera" android:required="true" />
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!-- Microphone: acoustic tap diagnostic -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- IR blaster: AC functional verification. iQOO 15 has this hardware (verified);
+         require=false so the app installs on devices without it, with the IR module
+         degrading gracefully at runtime (see IrController). -->
+    <uses-feature android:name="android.hardware.consumerir" android:required="false" />
+
+    <!-- Location: attached to the signed report for the inspected property -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
+    <!-- Vibration: haptic confirmation on Tier-1 flags -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.SmartLeaseEdge"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:screenOrientation="portrait">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>

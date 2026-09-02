@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- Inspection reports are local-only by design (offline-first) — excluded from cloud backup. -->
+    <exclude domain="database" path="smartlease.db" />
+</full-backup-content>
