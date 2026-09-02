@@ -258,7 +258,7 @@ This project was built for the **iQOO Hackathon 2026 — Chennai City Battle** (
 
 ## 🔗 Quick Links
 
-- **GitHub:** (this repository)
+- **GitHub:** [smartlease-edge-chennai](https://github.com/muhammedsayeedurrahman/smartlease-edge-chennai)
 - **Hackathon submission:** [iQOO Hackathon Portal](https://iqoo.com/in)
 - **Demo video:** (TBD after Day 11 rehearsal)
 - **Live demo:** Sep 12–13, 2026 — Chennai
