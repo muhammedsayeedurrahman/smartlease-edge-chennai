@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 6
+names: ['paint drips', 'peeling paint', 'pin holes', 'rough and patchy surface', 'stain marks', 'trowels marks']
+
+roboflow:
+  workspace: chew-poh-yee
+  project: internal-wall-finishing-defects
+  version: 5
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/chew-poh-yee/internal-wall-finishing-defects/dataset/5

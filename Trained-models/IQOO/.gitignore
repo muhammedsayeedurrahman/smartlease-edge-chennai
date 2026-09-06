@@ -1,0 +1,37 @@
+# Trained models (large files)
+models/
+!models/.gitkeep
+
+# Generated outputs
+outputs/
+!outputs/.gitkeep
+
+# Virtual environment
+venv/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# YOLO training runs
+runs/
+
+# Datasets (download separately)
+datasets/
+!datasets/.gitkeep
+
+# Synthetic audio data
+data/synthetic_audio/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp

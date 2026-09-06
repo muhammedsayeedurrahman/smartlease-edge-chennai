@@ -1,0 +1,33 @@
+# SmartLease Edge — Python Practice Prototype Dependencies
+# Install: pip install -r requirements.txt
+
+# Vision
+ultralytics>=8.2.0
+opencv-python-headless>=4.9.0
+onnx>=1.16.0
+onnxruntime>=1.18.0
+
+# Audio / Acoustic
+librosa>=0.10.0
+soundfile>=0.12.0
+torchaudio>=2.4.0
+
+# ML Core
+torch>=2.4.0
+torchvision>=0.19.0
+scikit-learn>=1.5.0
+numpy>=1.26.0
+
+# Report Generation
+fpdf2>=2.8.0
+Pillow>=10.0.0
+
+# Demo UI
+gradio>=4.40.0
+
+# Data Processing
+matplotlib>=3.8.0
+scipy>=1.13.0
+tqdm>=4.66.0
+requests>=2.31.0
+pyyaml>=6.0.0
