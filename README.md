@@ -1,57 +1,47 @@
-# SmartLease Edge 🏠
+# SmartLease Edge
 
-> **100% Offline Property Verification · Powered by iQOO 15 Snapdragon 8 Elite**
+**Offline property verification for rental move-outs using on-device AI**
 
-[![iQOO Hackathon 2026](https://img.shields.io/badge/iQOO_Hackathon-2026-blueviolet?style=for-the-badge)](https://iqoo.com/in)
-[![Smart Living Track](https://img.shields.io/badge/Track-Smart_Living-brightgreen?style=for-the-badge)](https://iqoo.com/in)
-[![Chennai City Battle](https://img.shields.io/badge/City-Chennai-orange?style=for-the-badge)](https://iqoo.com/in)
-[![Event Date](https://img.shields.io/badge/Event-Sep_12--13_2026-red?style=for-the-badge)](https://iqoo.com/in)
+iQOO Hackathon 2026 · Smart Living Track · Chennai City Battle · Sep 12–13, 2026
 
 ---
 
-## 🏆 Team Track Record
+## Team Background
 
-**Proven hackathon winners · Not first-time participants**
-
-- 🥇 **1st Place** — Lawtrix @ Sairam Engineering College
-- 🏅 **SIH Finalist** — Smart India Hackathon (national competition)
-- 🏅 **IOB Hackathon Top 10** — Mule Catch (fraud detection system)
-
-We know how to execute under pressure, scope realistically, and deliver working demos when the clock runs out.
+Three-person team with previous hackathon experience:
+- 1st Place: Lawtrix (Sairam Engineering College)
+- SIH Finalist (Smart India Hackathon)
+- IOB Hackathon Top 10: Mule Catch project
 
 ---
 
-## 🎯 The Problem We're Solving
+## Problem
 
-Security deposit disputes are **the single biggest source of landlord-tenant conflict in India**. Every source traces the cause back to the same thing: **no move-in documentation**.
+Security deposit disputes are the primary source of landlord-tenant conflict in India, consistently traced to lack of move-in documentation. In Bengaluru, deposits typically run 6–9 months' rent, making documentation failures expensive.
 
-In cities like Bengaluru, deposits run **6–9 months' rent** — making disputes high-stakes when they happen. 
-
-**SmartLeaseEdge** closes this gap with a timestamped, sensor-backed property verification system that works **100% offline** — no cloud, no connectivity, no data leaving the device.
+SmartLeaseEdge provides timestamped, sensor-backed property verification that operates entirely offline. No cloud dependency means it works in basements, areas with poor connectivity, and doesn't require uploading tenant property data to external servers.
 
 ---
 
-## ✨ Competitive Differentiation
+## Competitive Analysis
 
-**We researched 4 real competitors with real pricing — here's the gap we fill:**
+Researched existing solutions with verified pricing:
 
 | Feature | SmartLeaseEdge | NoBroker | TurboTenant | zInspector | RentCheck |
 |---------|---------------|----------|-------------|------------|-----------|
-| **Offline capable** | ✅ 100% offline | ❌ Needs inspector | ❌ Cloud-dependent | ❌ Cloud SaaS | ❌ Cloud SaaS |
-| **Functional testing** | ✅ IR + acoustic | ❌ Visual only | ❌ Manual only | ❌ Visual only | ❌ Visual only |
-| **AI defect detection** | ✅ On-device NPU | ❌ Human inspector | ❌ None | ✅ Cloud AI | ✅ Cloud AI |
-| **Pricing** | ₹299–499 one-time | ₹1,649–5,999/inspection | Free (manual) | $0–115/mo | $0.60–1.10/unit/mo |
-| **Target user** | Single tenant/landlord | Portfolio managers | DIY landlords | Property managers | Property managers |
+| Offline operation | Yes | No (human inspector) | No (cloud) | No (SaaS) | No (SaaS) |
+| Functional testing | IR + acoustic | Visual only | Manual | Visual only | Visual only |
+| AI detection | On-device NPU | Human | None | Cloud AI | Cloud AI |
+| Pricing | ₹299–499 one-time | ₹1,649–5,999/inspection | Free (manual) | $0–115/mo | $0.60–1.10/unit/mo |
+| Target user | Single lease | Portfolios | DIY | Property managers | Property managers |
 
-### The Novelty
+**Key differentiation:** No existing solution combines offline operation with functional diagnostic testing. 
 
-**No competitor combines both:**
-1. **100% offline operation** (works in basements, remote areas, no data upload)
-2. **Functional diagnostic testing** (verifies appliances actually work, not just how they look)
+- NoBroker: Requires scheduling human inspector, several days lead time, ₹1,649–5,999 per inspection
+- zInspector/RentCheck: Cloud-dependent SaaS, per-unit pricing model unsuitable for single-lease use case
+- TurboTenant: Manual documentation only, no automated defect detection
 
-NoBroker requires scheduling a human inspector days in advance. zInspector and RentCheck need the cloud and are priced for property managers with dozens of units. TurboTenant is manual-only with no AI.
-
-**SmartLeaseEdge is the only offline, on-device AI solution that tests function, not just appearance.**
+SmartLeaseEdge targets the gap: offline-capable, tests appliance function (not just visual appearance), priced for single tenant-landlord transactions.
 
 ---
 
@@ -91,22 +81,22 @@ NoBroker requires scheduling a human inspector days in advance. zInspector and R
 
 ---
 
-## 📱 Hardware-First Design: iQOO 15 Feature Utilization
+## iQOO 15 Hardware Utilization
 
-**8 specific iQOO 15 features mapped to 8 specific jobs — not just "uses the NPU"**
+Specific hardware features mapped to implementation requirements:
 
-| iQOO 15 Hardware | Verified Spec | Specific Job in SmartLeaseEdge | Why It Matters |
-|------------------|---------------|-------------------------------|----------------|
-| **Snapdragon 8 Elite Gen 5 Hexagon NPU** | 37% faster AI vs. prior gen | Runs GenieX Llama-3.2 report synthesis + YOLOv8-Seg vision segmentation | On-device AI means no cloud upload → works offline in basements, remote areas |
-| **8K Vapor Chamber Cooling** | Sustained thermal management under load | Enables one uninterrupted 30-min property walkthrough — continuous camera + NPU + mic | Prevents thermal throttling that would quietly degrade inference speed mid-demo on phones without this cooling |
-| **Triple 50MP Camera System** | Sony IMX921 OIS + 50MP ultrawide + periscope telephoto (100x digital zoom) | **OIS:** Stabilizes AR overlay for pixel-accurate alignment<br>**Ultrawide:** Captures full wall in one frame<br>**Telephoto:** Inspects small cracks/nail holes from distance | OIS makes AR alignment accurate; telephoto inspects fragile surfaces without touching them |
-| **6000-nit 2K LTPO Display** | Peak brightness rating | AR ghost-overlay legible even in bright, sunlit room during daytime inspection | Not just a dim-room demo trick — works in real inspection conditions |
-| **7000mAh Battery + 100W Charging** | Large capacity, fast recharge | Survives full 20–40 min walkthrough without battery anxiety; recharges fast between Eval Round 1 and Round 2 | Critical for hackathon demo reliability across multiple evaluation rounds |
-| **Sensing Hub** | Always-on, low-power sensor processing path | Runs lightweight "is there a tap sound" listener continuously | Doesn't pull power from main NPU — energy-efficient acoustic monitoring |
-| **Dual Stereo Speakers** | 120% louder vs. prior gen | Audible confirmation tones synced to acoustic tap results | Makes tile-sounding test legible to a room of judges, not just the person holding the phone |
-| **Vivo Office Kit** | Screen mirror, clipboard sync, remote control | Live demo screen-mirrored to projector so judges see phone screen clearly | Genuine phone-only build sessions; judges can watch real-time development |
+| Hardware Component | Specification | Implementation Use Case |
+|--------------------|---------------|------------------------|
+| Snapdragon 8 Elite Gen 5 Hexagon NPU | 37% faster AI inference vs. prior generation | Runs GenieX Llama-3.2 (report generation) + YOLOv8-Seg (vision segmentation) on-device |
+| 8K Vapor Chamber Cooling | Sustained thermal management | Maintains consistent NPU performance during 30-minute continuous walkthrough without thermal throttling |
+| Triple 50MP Camera (Sony IMX921 OIS, ultrawide, periscope) | OIS, multi-focal lengths | OIS: Stabilizes AR overlay alignment; Ultrawide: Full-wall capture; Telephoto: Inspects small defects from distance |
+| 6000-nit 2K LTPO Display | High peak brightness | Maintains AR overlay visibility in bright outdoor/sunlit conditions during actual inspections |
+| 7000mAh Battery + 100W Charging | Extended capacity, fast charging | Supports 20–40 minute walkthrough; rapid recharge between hackathon evaluation rounds |
+| Sensing Hub | Low-power always-on sensor processing | Continuous acoustic event detection without main NPU power draw |
+| Dual Stereo Speakers | Enhanced audio output (120% louder) | Audible acoustic tap confirmation for demo presentation |
+| Vivo Office Kit | Screen mirroring, remote control | Live screen projection for evaluation; phone-only development workflow |
 
-**Why this mapping matters:** Most hackathon teams say "we used the NPU." Naming the exact hardware and the specific job it does is what separates generic claims from real technical depth under judge Q&A.
+This mapping addresses the common gap where teams claim generic "NPU usage" without specifying which hardware features solve which technical requirements.
 
 ---
 
