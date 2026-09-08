@@ -1,6 +1,6 @@
 # SmartLease Edge 🏠
 
-> **Offline, phone-first property verification for the real world**
+> **100% Offline Property Verification · Powered by iQOO 15 Snapdragon 8 Elite**
 
 [![iQOO Hackathon 2026](https://img.shields.io/badge/iQOO_Hackathon-2026-blueviolet?style=for-the-badge)](https://iqoo.com/in)
 [![Smart Living Track](https://img.shields.io/badge/Track-Smart_Living-brightgreen?style=for-the-badge)](https://iqoo.com/in)
@@ -9,25 +9,49 @@
 
 ---
 
-## 🎯 The Problem
+## 🏆 Team Track Record
 
-Security deposit disputes are **the single biggest source of landlord-tenant conflict in India**. Every source traces the cause back to the same thing: **no move-in documentation**.
+**Proven hackathon winners · Not first-time participants**
 
-In cities like Bengaluru, deposits run **6–9 months' rent** — making disputes high-stakes when they happen. SmartLeaseEdge closes this gap with a timestamped, sensor-backed baseline record that works **100% offline**.
+- 🥇 **1st Place** — Lawtrix @ Sairam Engineering College
+- 🏅 **SIH Finalist** — Smart India Hackathon (national competition)
+- 🏅 **IOB Hackathon Top 10** — Mule Catch (fraud detection system)
+
+We know how to execute under pressure, scope realistically, and deliver working demos when the clock runs out.
 
 ---
 
-## ✨ What Makes This Different
+## 🎯 The Problem We're Solving
+
+Security deposit disputes are **the single biggest source of landlord-tenant conflict in India**. Every source traces the cause back to the same thing: **no move-in documentation**.
+
+In cities like Bengaluru, deposits run **6–9 months' rent** — making disputes high-stakes when they happen. 
+
+**SmartLeaseEdge** closes this gap with a timestamped, sensor-backed property verification system that works **100% offline** — no cloud, no connectivity, no data leaving the device.
+
+---
+
+## ✨ Competitive Differentiation
+
+**We researched 4 real competitors with real pricing — here's the gap we fill:**
 
 | Feature | SmartLeaseEdge | NoBroker | TurboTenant | zInspector | RentCheck |
 |---------|---------------|----------|-------------|------------|-----------|
 | **Offline capable** | ✅ 100% offline | ❌ Needs inspector | ❌ Cloud-dependent | ❌ Cloud SaaS | ❌ Cloud SaaS |
 | **Functional testing** | ✅ IR + acoustic | ❌ Visual only | ❌ Manual only | ❌ Visual only | ❌ Visual only |
 | **AI defect detection** | ✅ On-device NPU | ❌ Human inspector | ❌ None | ✅ Cloud AI | ✅ Cloud AI |
-| **Pricing model** | ₹299–499 one-time | ₹1,649–5,999/inspection | Free (manual) | $0–115/mo | $0.60–1.10/unit/mo |
+| **Pricing** | ₹299–499 one-time | ₹1,649–5,999/inspection | Free (manual) | $0–115/mo | $0.60–1.10/unit/mo |
 | **Target user** | Single tenant/landlord | Portfolio managers | DIY landlords | Property managers | Property managers |
 
-**The novelty:** Fully offline, on-device AI with **functional diagnostic testing** — no competitor does both.
+### The Novelty
+
+**No competitor combines both:**
+1. **100% offline operation** (works in basements, remote areas, no data upload)
+2. **Functional diagnostic testing** (verifies appliances actually work, not just how they look)
+
+NoBroker requires scheduling a human inspector days in advance. zInspector and RentCheck need the cloud and are priced for property managers with dozens of units. TurboTenant is manual-only with no AI.
+
+**SmartLeaseEdge is the only offline, on-device AI solution that tests function, not just appearance.**
 
 ---
 
@@ -67,43 +91,63 @@ In cities like Bengaluru, deposits run **6–9 months' rent** — making dispute
 
 ---
 
-## 📱 iQOO 15 Hardware Utilization
+## 📱 Hardware-First Design: iQOO 15 Feature Utilization
 
-| Hardware | Spec | Job in SmartLeaseEdge |
-|----------|------|----------------------|
-| **Snapdragon 8 Elite Gen 5 NPU** | 37% faster AI vs. prior gen | Runs GenieX Llama-3.2 + YOLOv8-Seg vision segmenter |
-| **8K Vapor Chamber Cooling** | Sustained thermal management | Enables one uninterrupted property walkthrough — continuous camera + NPU + mic without thermal throttling |
-| **Triple 50MP Camera** | Sony IMX921 OIS + ultrawide + periscope | OIS stabilizes AR overlay; ultrawide captures full wall; telephoto zooms on small defects |
-| **6000-nit 2K LTPO Display** | Peak brightness | AR ghost-overlay legible in bright sunlit rooms during daytime inspections |
-| **7000mAh Battery + 100W Charging** | Large capacity, fast recharge | Survives 20–40 min walkthrough; recharges between hackathon eval rounds |
-| **Sensing Hub** | Always-on low-power sensor processing | Runs lightweight "is there a tap sound" listener continuously |
-| **Dual Stereo Speakers** | 120% louder vs. prior gen | Audible confirmation tones synced to acoustic tap results for judges |
-| **Vivo Office Kit** | Screen mirror, clipboard sync | Live demo screen-mirrored to projector for judges |
+**8 specific iQOO 15 features mapped to 8 specific jobs — not just "uses the NPU"**
+
+| iQOO 15 Hardware | Verified Spec | Specific Job in SmartLeaseEdge | Why It Matters |
+|------------------|---------------|-------------------------------|----------------|
+| **Snapdragon 8 Elite Gen 5 Hexagon NPU** | 37% faster AI vs. prior gen | Runs GenieX Llama-3.2 report synthesis + YOLOv8-Seg vision segmentation | On-device AI means no cloud upload → works offline in basements, remote areas |
+| **8K Vapor Chamber Cooling** | Sustained thermal management under load | Enables one uninterrupted 30-min property walkthrough — continuous camera + NPU + mic | Prevents thermal throttling that would quietly degrade inference speed mid-demo on phones without this cooling |
+| **Triple 50MP Camera System** | Sony IMX921 OIS + 50MP ultrawide + periscope telephoto (100x digital zoom) | **OIS:** Stabilizes AR overlay for pixel-accurate alignment<br>**Ultrawide:** Captures full wall in one frame<br>**Telephoto:** Inspects small cracks/nail holes from distance | OIS makes AR alignment accurate; telephoto inspects fragile surfaces without touching them |
+| **6000-nit 2K LTPO Display** | Peak brightness rating | AR ghost-overlay legible even in bright, sunlit room during daytime inspection | Not just a dim-room demo trick — works in real inspection conditions |
+| **7000mAh Battery + 100W Charging** | Large capacity, fast recharge | Survives full 20–40 min walkthrough without battery anxiety; recharges fast between Eval Round 1 and Round 2 | Critical for hackathon demo reliability across multiple evaluation rounds |
+| **Sensing Hub** | Always-on, low-power sensor processing path | Runs lightweight "is there a tap sound" listener continuously | Doesn't pull power from main NPU — energy-efficient acoustic monitoring |
+| **Dual Stereo Speakers** | 120% louder vs. prior gen | Audible confirmation tones synced to acoustic tap results | Makes tile-sounding test legible to a room of judges, not just the person holding the phone |
+| **Vivo Office Kit** | Screen mirror, clipboard sync, remote control | Live demo screen-mirrored to projector so judges see phone screen clearly | Genuine phone-only build sessions; judges can watch real-time development |
+
+**Why this mapping matters:** Most hackathon teams say "we used the NPU." Naming the exact hardware and the specific job it does is what separates generic claims from real technical depth under judge Q&A.
 
 ---
 
-## 🚀 Current Status (Day 2 of 12)
+## 🚀 Current Status (Day 2 of 12) — Honest MVP Assessment
 
-### ✅ What's Real and Working
+### ✅ What's Real and Working Right Now
+
+We believe in honest execution, not vaporware. Here's what actually works today vs. what's coming:
 
 | Subsystem | Implementation | Status |
 |-----------|----------------|--------|
-| Camera capture + preview | `camera/CameraController.kt` | ✅ Real CameraX wrapper |
-| AR baseline alignment | `camera/ArAlignmentTracker.kt` | ✅ Real SensorManager rotation tracking |
-| OCR | `ocr/OcrEngine.kt` | ✅ Real ML Kit on-device text recognition |
-| IR transmit | `ir/IrController.kt` | ✅ Real ConsumerIrManager wrapper |
-| Acoustic tap analysis | `acoustic/AcousticTapClassifier.kt` + `Fft.kt` | ✅ Real AudioRecord + FFT + heuristic |
-| Safety gate | `safety/SafetyGate.kt` | ✅ Real deterministic keyword-based rules |
-| PDF report generation | `report/ReportGenerator.kt` | ✅ Real offline PDF rendering |
-| Local storage | `data/` | ✅ Real Room database |
+| **Camera capture + preview** | `camera/CameraController.kt` | ✅ Real CameraX wrapper, binds to device rear camera |
+| **AR baseline alignment** | `camera/ArAlignmentTracker.kt` | ✅ Real SensorManager rotation-vector tracking, pitch/roll delta from baseline |
+| **OCR** | `ocr/OcrEngine.kt` | ✅ Real ML Kit on-device text recognition, fully offline |
+| **IR transmit** | `ir/IrController.kt` | ✅ Real ConsumerIrManager wrapper — transmits IR patterns |
+| **Acoustic tap analysis** | `acoustic/AcousticTapClassifier.kt` + `Fft.kt` | ✅ Real AudioRecord capture, real FFT, amplitude/decay heuristic |
+| **Safety gate** | `safety/SafetyGate.kt` | ✅ Real deterministic keyword-based rule engine |
+| **PDF report generation** | `report/ReportGenerator.kt` | ✅ Real offline PDF rendering (Android PdfDocument API) |
+| **Local storage** | `data/` | ✅ Real Room database, backup-excluded by design |
 
-### 🔧 Honestly Stubbed (Training in Progress)
+**Build verification:**
+```bash
+./gradlew :app:assembleDebug
+# Output: app/build/outputs/apk/debug/app-debug.apk (~56MB)
+# Installs and runs on device today
+```
 
-| Subsystem | Why Stubbed | Timeline |
-|-----------|-------------|----------|
-| Vision defect segmenter | Needs YOLOv8-Seg training + ExecuTorch export | Days 3–8 |
-| GenieX report narrative | Needs Qualcomm GenieX SDK integration | Days 9–10 |
-| Real AC IR patterns | Needs live capture from demo unit | Day 12 (on-site) |
+### 🔧 Honestly Stubbed — What We're Training Before the Event
+
+| Subsystem | Why Stubbed | Our 12-Day Plan |
+|-----------|-------------|----------------|
+| **Vision defect segmenter** | Real version needs YOLOv8-Seg training on wall damage dataset + ExecuTorch export to Hexagon NPU | **Days 3–8:** Train on 200–500 collected images, export to `.pte` format, test NPU delegate |
+| **GenieX report narrative** | Real version needs Qualcomm GenieX SDK integration for on-device Llama-3.2 | **Days 9–10:** Wire GenieX SDK into `ReportGenerator.kt`, test offline synthesis |
+| **Real AC IR patterns** | Can only be captured from the actual on-stage demo AC unit | **Day 12 (on-site):** Live IR capture from venue AC — the one unavoidable live step |
+
+**Placeholder implementations today:**
+- `HeuristicDefectSegmenter`: Basic color/contrast region flagging (explicitly marked `isTrainedModel = false`)
+- `synthesizeNarrative()`: Templated text generation (swaps to GenieX once wired)
+- `CommonAcIrProfiles`: Carrier frequencies only (real patterns loaded Day 12)
+
+**Why we're honest about this:** Under judge Q&A, claiming something works when it doesn't kills credibility. We'd rather show a clear de-risking plan that proves we know what's hard and have a schedule to solve it.
 
 ---
 
@@ -221,15 +265,38 @@ python validate_training_data.py
 
 ---
 
-## 🏆 Team
+## 🏆 Team Structure & Execution Strategy
 
-**3-person team for iQOO Hackathon 2026 — Chennai City Battle**
+**3-person team · Structured for parallel execution**
 
-| Role | Pre-Event Focus | Event-Day Focus |
-|------|----------------|-----------------|
-| **Member 1 — AI/NPU Engineer** | Train & export models (acoustic + vision); GenieX testing | Integrate pre-tested models; tune to venue conditions |
-| **Member 2 — Android/Hardware Lead** | AR overlay, IR transmit, pre-capture AC IR codes | Live on-site IR capture; Office Kit Red Light sessions |
-| **Member 3 — Product/Demo Pitcher** | Report UI, pricing logic, source citations, draft pitch | Rehearsed demo delivery, judge Q&A |
+### Team Roles
+
+| Role | Pre-Event Focus (Days 1–11) | Event-Day Focus (Sep 12–13) |
+|------|----------------------------|----------------------------|
+| **Member 1 — AI/NPU Engineer** | Train & export models (acoustic classifier, YOLOv8-Seg vision); GenieX SDK integration | Integrate pre-tested models into live app; tune to venue lighting/acoustics |
+| **Member 2 — Android/Hardware Lead** | Build AR overlay UI, IR transmit pipeline, camera features; pre-capture AC IR codes | Live on-site IR capture from demo AC unit; Vivo Office Kit Red Light build sessions |
+| **Member 3 — Research/Demo/Testing** | Data collection assist, testing, demo script, props, pitch prep | Rehearsed demo delivery (3-min timed); handle judge Q&A |
+
+### Why This Structure Works
+
+**File ownership prevents Git conflicts:**
+- Member 1 owns: `training_data/`, `models/`, ML scripts
+- Member 2 owns: `app/src/.../ui/`, Android code
+- Member 3 owns: `docs/`, demo materials, test cases
+
+**Daily 15-min sync:**
+- What I completed today
+- What I'm working on tomorrow
+- Blockers / dependencies on other members
+
+**Response time expectations:**
+- Urgent (blockers): <1 hour
+- Normal questions: <4 hours
+- Code reviews: <8 hours
+
+**12-day de-risking plan trains the hardest models BEFORE the event** — so the 30-hour clock is spent on integration and polish, not first-time R&D under pressure.
+
+See [`TEAM_STRUCTURE.md`](./TEAM_STRUCTURE.md) for full breakdown.
 
 ---
 
