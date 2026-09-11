@@ -1,13 +1,20 @@
+names:
+- chip
+- crack
+- leakage
+- peeling
+- potholes
+- protective layer
+- rebar corrosion
+- rebar exposure
+- rebar gap
+nc: 9
+roboflow:
+  license: CC BY 4.0
+  project: concrete-defects-gn6lu
+  url: https://universe.roboflow.com/ammlworkspace/concrete-defects-gn6lu/dataset/1
+  version: 1
+  workspace: ammlworkspace
+test: ../test/images
 train: ../train/images
 val: ../valid/images
-test: ../test/images
-
-nc: 9
-names: ['chip', 'crack', 'leakage', 'peeling', 'potholes', 'protective layer', 'rebar corrosion', 'rebar exposure', 'rebar gap']
-
-roboflow:
-  workspace: ammlworkspace
-  project: concrete-defects-gn6lu
-  version: 1
-  license: CC BY 4.0
-  url: https://universe.roboflow.com/ammlworkspace/concrete-defects-gn6lu/dataset/1

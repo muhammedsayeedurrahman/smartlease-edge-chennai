@@ -19,9 +19,20 @@ android {
 
         ndk {
             // PyTorch ships libpytorch_jni_lite.so per-ABI at ~40-58 MB each; bundling all
-            // four takes the APK to ~295 MB. The iQOO 15 (and every demo handset we use) is
-            // arm64-v8a, so ship only that. Add "x86_64" here if you need an x86 emulator.
+            // four takes the APK to ~295 MB. The demo handset (iQOO 15) is arm64-v8a, so
+            // that is all a shipping build carries.
+            //
+            // The Android emulator on an x86 host is x86_64, and an APK without a matching
+            // ABI fails to install with INSTALL_FAILED_NO_MATCHING_ABIS. Rather than editing
+            // this file to test locally, pass the extra ABI on the command line:
+            //     ./gradlew :app:assembleDebug -PextraAbis=x86_64
             abiFilters += "arm64-v8a"
+            val extraAbis = (project.findProperty("extraAbis") as String?)
+                ?.split(",")
+                ?.map { it.trim() }
+                ?.filter { it.isNotEmpty() }
+                ?: emptyList()
+            abiFilters += extraAbis
         }
     }
 

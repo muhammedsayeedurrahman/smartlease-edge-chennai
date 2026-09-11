@@ -1,13 +1,14 @@
+names:
+- mildcrack
+- severecrack
+- spall
+nc: 3
+roboflow:
+  license: CC BY 4.0
+  project: structural-defects
+  url: https://universe.roboflow.com/kamar/structural-defects/dataset/1
+  version: 1
+  workspace: kamar
+test: ../test/images
 train: ../train/images
 val: ../valid/images
-test: ../test/images
-
-nc: 3
-names: ['mildcrack', 'severecrack', 'spall']
-
-roboflow:
-  workspace: kamar
-  project: structural-defects
-  version: 1
-  license: CC BY 4.0
-  url: https://universe.roboflow.com/kamar/structural-defects/dataset/1

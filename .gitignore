@@ -90,6 +90,15 @@ lint/tmp/
 # Local agent/IDE config (machine-specific)
 .claude/settings.local.json
 
+# Secrets. API keys live here and must never be committed; see
+# ml/YOLOV8/download_datasets.py for how they are read.
+.env
+.env.local
+.env.*.local
+*.key
+credentials.json
+kaggle.json
+
 # ML datasets: large, re-downloadable, and must never enter git again.
 # Scoped broadly on purpose -- the previous rules only covered training_data/,
 # so a dataset committed under a different directory slipped straight past them.
