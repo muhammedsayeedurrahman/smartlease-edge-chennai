@@ -1,6 +1,11 @@
-# Trained models (large files)
-models/
+# Trained models (large files).
+# "models/*" not "models/": git does not descend into an excluded directory, so a
+# !negation for a file inside one never takes effect. Globbing the contents keeps the
+# directory visible and lets the small fitted classifier + its report through.
+models/*
 !models/.gitkeep
+!models/acoustic_tap_clf.joblib
+!models/acoustic_report.json
 # Pretrained/base weights are re-downloadable, don't commit them
 *.pt
 *.pth

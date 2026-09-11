@@ -203,8 +203,43 @@ def main():
         )
     print("\nVERDICT: %s" % verdict)
 
+    # --- Fit the final model on every tap and persist it -------------------------------
+    # CV above estimates how well this recipe generalises; it does not leave a usable model
+    # behind. The shipped classifier is refit here on all data, because with a dataset this
+    # small throwing away any fold's worth of examples is a real loss.
+    import joblib
+
+    final_model = models[best_name]
+    final_model.fit(X, y)
+    train_acc = float((final_model.predict(X) == y).mean())
+
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
+    model_path = out / "acoustic_tap_clf.joblib"
+    joblib.dump(
+        {
+            "model": final_model,
+            "classes": CLASSES,
+            "sample_rate": SAMPLE_RATE,
+            "tap_window_s": TAP_WINDOW_S,
+            "n_features": int(X.shape[1]),
+            "feature_order": (
+                "mfcc_mean[13], mfcc_std[13], centroid_mean, centroid_std, rolloff_mean, "
+                "bandwidth_mean, flatness_mean, zcr_mean, decay_ms, low_ratio, mid_ratio, high_ratio"
+            ),
+            "trained_on": {"n_taps": int(len(X)), "recordings": sorted(set(groups.tolist()))},
+            "grouped_logo_accuracy": float(best_acc),
+            "grouped_logo_ci95": [lo, hi],
+        },
+        model_path,
+    )
+    print("\nFinal model: %s refit on all %d taps" % (best_name, len(X)))
+    print("  training-set accuracy %.1f%%  <- NOT a generalisation estimate, it has seen this data"
+          % (train_acc * 100))
+    print("  honest estimate is the grouped CV figure above: %.1f%% (95%% CI %.1f-%.1f%%)"
+          % (best_acc * 100, lo * 100, hi * 100))
+    print("  saved -> %s" % model_path)
+
     report = {
         "n_taps": int(len(X)), "n_solid": n_solid, "n_hollow": n_hollow,
         "n_recordings": len(set(groups)),
@@ -212,6 +247,8 @@ def main():
         "grouped_logo_accuracy": {k: float(v) for k, v in results.items()},
         "best_model": best_name,
         "best_accuracy_95ci": [lo, hi],
+        "final_model_path": str(model_path),
+        "final_train_accuracy": train_acc,
         "n_evaluated": n_total,
         "evaluation": "LeaveOneGroupOut, grouped by source recording (no sibling leakage)",
         "verdict": verdict,

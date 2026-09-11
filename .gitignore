@@ -96,7 +96,12 @@ lint/tmp/
 ml/data/dataset/
 ml/data/datasets/
 ml/datasets/
-ml/models/
+# Excluded as "ml/models/*" not "ml/models/": git will not descend into an excluded
+# DIRECTORY, so a !negation for a file inside it can never fire. Globbing the contents
+# instead keeps the directory visible and lets the two small artifacts below through.
+ml/models/*
+!ml/models/acoustic_tap_clf.joblib
+!ml/models/acoustic_report.json
 ml/outputs/
 ml/runs/
 **/data/dataset/

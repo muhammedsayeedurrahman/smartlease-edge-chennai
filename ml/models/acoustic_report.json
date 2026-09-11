@@ -1,0 +1,21 @@
+{
+  "n_taps": 15,
+  "n_solid": 8,
+  "n_hollow": 7,
+  "n_recordings": 8,
+  "majority_baseline": 0.5333333333333333,
+  "grouped_logo_accuracy": {
+    "RandomForest": 0.8,
+    "LogisticRegression": 0.8666666666666667
+  },
+  "best_model": "LogisticRegression",
+  "best_accuracy_95ci": [
+    0.6211750079348376,
+    0.9626395301086407
+  ],
+  "final_model_path": "ml\\models\\acoustic_tap_clf.joblib",
+  "final_train_accuracy": 1.0,
+  "n_evaluated": 15,
+  "evaluation": "LeaveOneGroupOut, grouped by source recording (no sibling leakage)",
+  "verdict": "BEATS baseline -- worth shipping, but validate on freshly recorded taps"
+}
