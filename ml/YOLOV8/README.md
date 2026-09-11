@@ -102,3 +102,40 @@ PyTorch (best.pt)
                     └─> smartlease_vision_htp.pte (~6 MB INT8, <30 ms on Hexagon HTP)
 ```
 *(A companion script `snapdragon_htp_quantize_guide.py` is included directly in the export section of the notebook).*
+
+## Source datasets (not tracked in git)
+
+The image sets are excluded by `.gitignore` -- 9,043 files and a 118 MB archive do not
+belong in the repository. Re-download them from Roboflow in **YOLOv8 format** and unzip
+into the directories below.
+
+| Dir | Dataset | Link | License |
+|-----|---------|------|---------|
+| `1/` | Infrastructure Monitoring (12 cls) | https://universe.roboflow.com/pothole-detection-h9muz/infrastructure-monitoring/dataset/1 | CC BY 4.0 |
+| `2/` | Structural Defects (3 cls) | https://universe.roboflow.com/kamar/structural-defects/dataset/1 | CC BY 4.0 |
+| `3/` | Building Anomalies (6 cls) | https://universe.roboflow.com/image-classification-jf9vm/building-anomalies/dataset/1 | CC BY 4.0 |
+| `concrete/` | Concrete Defects (9 cls) | https://universe.roboflow.com/ammlworkspace/concrete-defects-gn6lu/dataset/1 | CC BY 4.0 |
+| `paint-peel/` | Paint Peel Detection (1 cls) | https://universe.roboflow.com/image-classification-jf9vm/detection-ghu6i/dataset/1 | Public Domain |
+
+`unified_defects/` is **derived, not downloaded**: it is the merge of the five above remapped
+onto the four classes the shipped model uses -- `crack, peeling, spalling, stain_mould`.
+Regenerate it rather than looking for a source:
+
+```bash
+py -3 ml/YOLOV8/merge_and_zip_datasets.py     # -> unified_defects/
+py -3 ml/YOLOV8/balance_dataset.py            # class balancing
+```
+
+The wall-finishing dataset used by the older pipeline lives elsewhere:
+`ml/data/dataset/internal-defect/` <- https://universe.roboflow.com/chew-poh-yee/internal-wall-finishing-defects/dataset/5
+
+## Retraining and export
+
+```bash
+# after training, export for the app (PyTorch Lite, runs today on CPU)
+py -3 ml/YOLOV8/export_torchscript_lite.py --weights best.pt
+cp ml/YOLOV8/yolov8n_seg.ptl app/src/main/assets/
+
+# NPU path (needs QNN SDK + ExecuTorch; see the caveats in the repo history)
+py -3 ml/YOLOV8/convert_yolov8_seg_qnn_pte.py --soc SM8650
+```
