@@ -28,7 +28,7 @@ import com.smartlease.edge.ir.IrController
 import com.smartlease.edge.ocr.OcrEngine
 import com.smartlease.edge.report.ReportGenerator
 import com.smartlease.edge.safety.SafetyGate
-import com.smartlease.edge.vision.HeuristicDefectSegmenter
+import com.smartlease.edge.vision.DefectSegmenterFactory
 import kotlinx.coroutines.launch
 import java.util.UUID
 
@@ -47,7 +47,7 @@ fun WalkthroughScreen(onReportGenerated: (String) -> Unit) {
     val cameraController = remember { CameraController(context, lifecycleOwner) }
     val arTracker = remember { ArAlignmentTracker(context) }
     val irController = remember { IrController(context) }
-    val visionSegmenter = remember { HeuristicDefectSegmenter() }
+    val visionSegmenter = remember { DefectSegmenterFactory.create(context) }
     val db = remember { AppDatabase.get(context) }
 
     var alignmentState by remember { mutableStateOf<ArAlignmentTracker.AlignmentState?>(null) }
@@ -126,11 +126,15 @@ fun WalkthroughScreen(onReportGenerated: (String) -> Unit) {
                             logFinding(FindingType.OCR_TEXT_READ, text.take(120))
                         }
                         val defects = visionSegmenter.segmentDefects(bitmap, frameWidthInches = 48f, frameHeightInches = 36f)
+                        // Label reflects which segmenter actually ran: a heuristic result must
+                        // never read like a model detection in the tenant-facing report.
+                        val mode = if (visionSegmenter.isTrainedModel) "YOLOv8n-Seg" else "heuristic"
                         defects.forEach { d ->
-                            val areaStr = "%.1f".format(d.areaSqFtEstimate)
+                            val areaStr = "%.2f".format(d.areaSqFtEstimate)
+                            val confStr = "%.0f".format(d.confidence * 100f)
                             logFinding(
                                 FindingType.VISUAL_DEFECT,
-                                d.label + ", ~" + areaStr + " sq ft (heuristic, confidence " + d.confidence + ")"
+                                d.label + ", ~" + areaStr + " sq ft (" + mode + ", " + confStr + "% confidence)"
                             )
                         }
                         if (defects.isEmpty() && text.isBlank()) {
