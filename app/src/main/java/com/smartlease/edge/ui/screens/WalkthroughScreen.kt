@@ -442,7 +442,7 @@ fun WalkthroughScreen(onReportGenerated: (String) -> Unit) {
                 .height(52.dp)
         ) {
             Text(
-                if (findings.isEmpty()) "Capture a finding first" else "Sign and save report",
+                if (findings.isEmpty()) "Capture a finding first" else "Save report",
                 style = MaterialTheme.typography.titleMedium
             )
         }
