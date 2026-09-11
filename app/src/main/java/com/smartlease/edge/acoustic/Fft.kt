@@ -27,6 +27,27 @@ object Fft {
         }
     }
 
+    /**
+     * Power spectrum with n/2 + 1 bins, i.e. DC through Nyquist inclusive.
+     *
+     * [magnitudeSpectrum] drops the Nyquist bin (it returns n/2), which is fine for the
+     * band-ratio heuristic but not for the trained classifier: the mel filterbank exported
+     * from Python is shaped (40, n/2 + 1), so a 256-bin input would silently misalign every
+     * filter against the wrong frequencies.
+     */
+    fun powerSpectrum(samples: FloatArray): FloatArray {
+        val n = samples.size
+        require(n > 0 && (n and (n - 1)) == 0) { "FFT input length must be a power of two, was $n" }
+
+        val re = DoubleArray(n) { samples[it].toDouble() }
+        val im = DoubleArray(n)
+        fftInPlace(re, im)
+
+        return FloatArray(n / 2 + 1) { i ->
+            (re[i] * re[i] + im[i] * im[i]).toFloat()
+        }
+    }
+
     private fun fftInPlace(re: DoubleArray, im: DoubleArray) {
         val n = re.size
 

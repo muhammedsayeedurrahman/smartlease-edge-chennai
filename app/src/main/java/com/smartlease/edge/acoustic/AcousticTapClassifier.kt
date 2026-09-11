@@ -42,7 +42,10 @@ object AcousticTapClassifier {
 
     @SuppressLint("MissingPermission")
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
-    fun recordAndClassifyOneTap(recordMillis: Int = 1200): TapResult {
+    fun recordAndClassifyOneTap(
+        recordMillis: Int = 1200,
+        trained: TrainedTapClassifier? = null
+    ): TapResult {
         val minBufferBytes = AudioRecord.getMinBufferSize(
             SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT
         )
@@ -72,11 +75,18 @@ object AcousticTapClassifier {
             recorder.release()
         }
 
-        return classify(pcm)
+        return classify(pcm, trained)
     }
 
-    /** Pure function, unit-testable without any Android audio hardware. */
-    fun classify(pcm: ShortArray): TapResult {
+    /**
+     * Pure function, unit-testable without any Android audio hardware.
+     *
+     * When a [TrainedTapClassifier] is supplied its verdict wins, and the heuristic's
+     * measurements (peak, decay, high-frequency ratio) are still reported alongside so the
+     * two can be compared in the field. With no model the deterministic heuristic stands --
+     * it is honest about being uncalibrated, which is preferable to a confident wrong answer.
+     */
+    fun classify(pcm: ShortArray, trained: TrainedTapClassifier? = null): TapResult {
         if (pcm.isEmpty()) {
             return TapResult(TapVerdict.INCONCLUSIVE, -120f, 0f, 0f, "Empty buffer")
         }
@@ -119,6 +129,17 @@ object AcousticTapClassifier {
             TapVerdict.LIKELY_HOLLOW -> "Fast decay (${decayMillis.toInt()}ms) + high-frequency-heavy tap — consistent with a hollow cavity behind the surface."
             TapVerdict.LIKELY_SOLID -> "Slow decay (${decayMillis.toInt()}ms) + low-frequency-heavy tap — consistent with solid masonry."
             TapVerdict.INCONCLUSIVE -> "Decay/frequency profile didn't clearly match either pattern — uncalibrated thresholds, or an ambiguous tap. Not reported as a finding."
+        }
+
+        val modelVerdict = trained?.classify(pcm, SAMPLE_RATE)
+        if (modelVerdict != null) {
+            return TapResult(
+                verdict = modelVerdict.tapVerdict,
+                peakDb = peakDb,
+                decayMillis = decayMillis,
+                highFreqRatio = highFreqRatio,
+                confidenceNote = modelVerdict.note
+            )
         }
 
         return TapResult(verdict, peakDb, decayMillis, highFreqRatio, note)

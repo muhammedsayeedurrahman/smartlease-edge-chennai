@@ -82,6 +82,9 @@ dependencies {
     implementation(libs.pytorch.torchvision.lite)
 
     testImplementation(libs.junit)
+    // Real org.json for unit tests: the android.jar stub throws on every method, so the
+    // acoustic model bundle could not be parsed off-device without it.
+    testImplementation("org.json:json:20240303")
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 }

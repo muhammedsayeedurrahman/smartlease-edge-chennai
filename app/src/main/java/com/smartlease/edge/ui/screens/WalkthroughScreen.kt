@@ -17,6 +17,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.camera.view.PreviewView
 import com.smartlease.edge.acoustic.AcousticTapClassifier
+import com.smartlease.edge.acoustic.TrainedTapClassifier
 import com.smartlease.edge.camera.ArAlignmentTracker
 import com.smartlease.edge.camera.CameraController
 import com.smartlease.edge.data.AppDatabase
@@ -48,6 +49,8 @@ fun WalkthroughScreen(onReportGenerated: (String) -> Unit) {
     val arTracker = remember { ArAlignmentTracker(context) }
     val irController = remember { IrController(context) }
     val visionSegmenter = remember { DefectSegmenterFactory.create(context) }
+    // null when no trained model ships -- classify() then keeps the heuristic
+    val trainedTapModel = remember { TrainedTapClassifier.create(context) }
     val db = remember { AppDatabase.get(context) }
 
     var alignmentState by remember { mutableStateOf<ArAlignmentTracker.AlignmentState?>(null) }
@@ -153,7 +156,7 @@ fun WalkthroughScreen(onReportGenerated: (String) -> Unit) {
                 scope.launch {
                     busy = true
                     try {
-                        val result = AcousticTapClassifier.recordAndClassifyOneTap()
+                        val result = AcousticTapClassifier.recordAndClassifyOneTap(trained = trainedTapModel)
                         logFinding(
                             FindingType.ACOUSTIC_TAP,
                             result.verdict.toString() + " (" + result.confidenceNote + ")"
