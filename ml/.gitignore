@@ -1,0 +1,46 @@
+# Trained models (large files)
+models/
+!models/.gitkeep
+# Pretrained/base weights are re-downloadable, don't commit them
+*.pt
+*.pth
+*.ptl
+
+# Generated outputs
+outputs/
+!outputs/.gitkeep
+
+# Virtual environment
+venv/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# YOLO training runs
+runs/
+
+# Datasets (download separately -- see README for the Roboflow export link).
+# NOTE: both spellings are ignored on purpose. The Roboflow export lands in
+# data/dataset/, which an earlier "datasets/"-only rule did not match, and
+# 14,504 image/label files were committed as a result.
+datasets/
+!datasets/.gitkeep
+data/dataset/
+data/datasets/
+
+# Synthetic audio data
+data/synthetic_audio/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp

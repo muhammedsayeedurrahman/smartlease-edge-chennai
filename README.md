@@ -181,7 +181,7 @@ adb install app/build/outputs/apk/debug/app-debug.apk
 - **Hollow:** Doors, drywall, empty boxes, hollow plastic
 - **Solid:** Concrete walls, solid wood, filled containers, tile on concrete
 
-📖 **Guide:** [`ACOUSTIC_RECORDING_CHECKLIST.md`](./ACOUSTIC_RECORDING_CHECKLIST.md)
+📖 **Guide:** [`ACOUSTIC_RECORDING_CHECKLIST.md`](./docs/guides/ACOUSTIC_RECORDING_CHECKLIST.md)
 
 ### Wall Damage Images
 
@@ -190,13 +190,13 @@ adb install app/build/outputs/apk/debug/app-debug.apk
 - **Public datasets:** Roboflow, Kaggle (pre-annotated)
 - **Own photos:** Nail holes, cracks, stains, peeling paint
 
-📖 **Guide:** [`DATA_COLLECTION_GUIDE.md`](./DATA_COLLECTION_GUIDE.md)
-📖 **Dataset sources:** [`DATASET_SOURCES.md`](./DATASET_SOURCES.md)
+📖 **Guide:** [`DATA_COLLECTION_GUIDE.md`](./docs/guides/DATA_COLLECTION_GUIDE.md)
+📖 **Dataset sources:** [`DATASET_SOURCES.md`](./docs/guides/DATASET_SOURCES.md)
 
 ### Validation
 
 ```bash
-python validate_training_data.py
+python tools/validate_training_data.py
 ```
 
 ---
@@ -249,9 +249,9 @@ python validate_training_data.py
 
 - **Hackathon submission plan:** [`SmartLease-Edge-Chennai-Battle-Plan.pdf`](C:\Users\HP\SmartLease-Edge-Chennai-Battle-Plan.pdf)
 - **Platform vision:** [`SmartLease-Edge-Platform-Vision.pdf`](C:\Users\HP\SmartLease-Edge-Platform-Vision.pdf)
-- **Data collection guide:** [`DATA_COLLECTION_GUIDE.md`](./DATA_COLLECTION_GUIDE.md)
-- **Dataset sources:** [`DATASET_SOURCES.md`](./DATASET_SOURCES.md)
-- **Acoustic recording checklist:** [`ACOUSTIC_RECORDING_CHECKLIST.md`](./ACOUSTIC_RECORDING_CHECKLIST.md)
+- **Data collection guide:** [`DATA_COLLECTION_GUIDE.md`](./docs/guides/DATA_COLLECTION_GUIDE.md)
+- **Dataset sources:** [`DATASET_SOURCES.md`](./docs/guides/DATASET_SOURCES.md)
+- **Acoustic recording checklist:** [`ACOUSTIC_RECORDING_CHECKLIST.md`](./docs/guides/ACOUSTIC_RECORDING_CHECKLIST.md)
 
 ---
 
@@ -286,7 +286,7 @@ python validate_training_data.py
 
 **12-day de-risking plan trains the hardest models BEFORE the event** — so the 30-hour clock is spent on integration and polish, not first-time R&D under pressure.
 
-See [`TEAM_STRUCTURE.md`](./TEAM_STRUCTURE.md) for full breakdown.
+See [`TEAM_STRUCTURE.md`](./docs/guides/TEAM_STRUCTURE.md) for full breakdown.
 
 ---
 

@@ -87,6 +87,20 @@ lint/tmp/
 # Android Profiling
 *.hprof
 
+# Local agent/IDE config (machine-specific)
+.claude/settings.local.json
+
+# ML datasets: large, re-downloadable, and must never enter git again.
+# Scoped broadly on purpose -- the previous rules only covered training_data/,
+# so a dataset committed under a different directory slipped straight past them.
+ml/data/dataset/
+ml/data/datasets/
+ml/datasets/
+ml/models/
+ml/outputs/
+ml/runs/
+**/data/dataset/
+
 # Training data (large files)
 training_data/acoustic/**/*.wav
 training_data/acoustic/**/*.m4a
@@ -101,6 +115,7 @@ models/checkpoints/
 *.onnx
 *.tflite
 *.pte
+*.pt
 
 # Python virtual environment (if used for ML training)
 venv/
@@ -115,3 +130,19 @@ __pycache__/
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+
+# --- ml/YOLOV8: track the code and the shippable model artifacts, never the data ---
+# Datasets (Roboflow exports + merged/balanced variants). Re-exportable; thousands of files.
+ml/YOLOV8/*/train/
+ml/YOLOV8/*/valid/
+ml/YOLOV8/*/test/
+ml/YOLOV8/calibration_data/
+ml/YOLOV8/dataset.zip
+ml/YOLOV8/runs/
+
+# Keep the trained weights and the NPU bundle: they are the build inputs for the app
+# and are not reproducible without a full retrain / re-conversion.
+!ml/YOLOV8/best.pt
+!ml/YOLOV8/qnn_android_bundle/
+!ml/YOLOV8/qnn_android_bundle/*.so
+!ml/YOLOV8/qnn_android_bundle/*.pte

@@ -13,7 +13,7 @@
 git clone https://github.com/muhammedsayeedurrahman/smartlease-edge-chennai.git
 cd smartlease-edge-chennai
 
-# Create your feature branch (see TEAM_STRUCTURE.md for your role)
+# Create your feature branch (see docs/guides/TEAM_STRUCTURE.md for your role)
 git checkout -b feature/your-branch-name
 git push -u origin feature/your-branch-name
 ```
@@ -38,7 +38,7 @@ git push -u origin feature/your-branch-name
 pip install -r requirements.txt
 
 # Verify setup
-python validate_training_data.py
+python tools/validate_training_data.py
 ```
 
 **For Documentation (Member 3):**
@@ -49,8 +49,8 @@ python validate_training_data.py
 
 ### 3. Read the Guides
 
-- `TEAM_STRUCTURE.md` — Your role and responsibilities
-- `GITHUB_WORKFLOW.md` — How to use Git for parallel work
+- `docs/guides/TEAM_STRUCTURE.md` — Your role and responsibilities
+- `docs/guides/GITHUB_WORKFLOW.md` — How to use Git for parallel work
 - `README.md` — Project overview
 - This file — Code standards
 
@@ -282,7 +282,7 @@ git commit -m "docs: add acoustic recording troubleshooting section"
 
 ### How to Request Review
 
-1. **Create Pull Request** (see GITHUB_WORKFLOW.md)
+1. **Create Pull Request** (see docs/guides/GITHUB_WORKFLOW.md)
 2. **Assign reviewers:**
    - At least 1 other team member
    - For critical code, assign 2
@@ -393,42 +393,41 @@ If you can't review soon, comment: "I'll review this tomorrow morning"
 ```
 smartlease-edge-chennai/
 ├── app/                          # Android app (Member 2)
-│   ├── src/main/java/com/smartlease/edge/
-│   │   ├── MainActivity.kt       # Entry point
-│   │   ├── ui/                   # Compose UI screens
-│   │   │   ├── screens/          # HomeScreen, WalkthroughScreen, ReportScreen
-│   │   │   └── theme/            # Colors, typography
-│   │   ├── camera/               # Camera & AR alignment
-│   │   ├── acoustic/             # Acoustic tap classifier
-│   │   ├── vision/               # Vision defect segmenter
-│   │   ├── ir/                   # IR transmit controller
-│   │   ├── ocr/                  # Text recognition
-│   │   ├── report/               # PDF report generator
-│   │   ├── safety/               # Safety gate
-│   │   └── data/                 # Room database
-│   └── build.gradle.kts          # Dependencies
-├── training_data/                # ML training data (Member 1)
-│   ├── acoustic/                 # Audio samples
-│   │   ├── hollow/
-│   │   └── solid/
-│   └── vision/                   # Image datasets
-│       ├── images/
-│       ├── labels/
-│       └── datasets/
-├── models/                       # Trained models (Member 1)
-│   ├── acoustic_classifier.tflite
-│   └── vision_segmenter.pte
-├── scripts/                      # Training scripts (Member 1)
-│   ├── train_acoustic.py
-│   ├── train_vision.py
-│   └── export_to_executorc.py
-├── docs/                         # Documentation (Member 3)
-│   ├── DEMO_SCRIPT.md
-│   ├── TEST_CASES.md
-│   └── USER_GUIDE.md
+│   ├── src/main/
+│   │   ├── java/com/smartlease/edge/
+│   │   │   ├── MainActivity.kt   # Entry point (launcher activity)
+│   │   │   ├── ui/screens/       # HomeScreen, WalkthroughScreen, ReportScreen
+│   │   │   ├── ui/theme/         # Colors, typography
+│   │   │   ├── camera/           # Camera & AR alignment
+│   │   │   ├── acoustic/         # Acoustic tap classifier
+│   │   │   ├── vision/           # Vision defect segmenter
+│   │   │   ├── ir/               # IR transmit controller
+│   │   │   ├── ocr/              # Text recognition (ML Kit)
+│   │   │   ├── report/           # PDF report generator
+│   │   │   ├── safety/           # Safety gate
+│   │   │   └── data/             # Room database
+│   │   ├── java/com/iqoo/multimodal/   # PyTorch model bench (non-launcher)
+│   │   └── assets/               # vision_best.ptl, acoustic_cnn.ptl
+│   └── build.gradle.kts
+├── ml/                           # Python training project (Member 1)
+│   ├── acoustic/                 # Log-Mel/MFCC features, CNN+RF training
+│   ├── vision/                   # YOLOv8-Seg training
+│   ├── report/                   # PDF report templates
+│   ├── export/                   # ExecuTorch/ONNX export
+│   ├── data/audio/               # Real recorded taps (tracked, small)
+│   ├── data/dataset/             # Roboflow dataset (NOT tracked -- see ml/README.md)
+│   ├── app.py                    # Gradio demo UI
+│   └── config.py                 # Hyperparameters & paths
+├── tools/                        # Data-collection helper scripts
+│   ├── acoustic_data_tracker.py
+│   ├── download_datasets.py
+│   └── validate_training_data.py
+├── docs/
+│   ├── guides/                   # Team, workflow & onboarding docs
+│   └── pitch/                    # Hackathon deck + generator
+├── training_data/                # Raw capture staging (not tracked)
+├── gradle/libs.versions.toml     # Dependency version catalog
 ├── README.md                     # Project overview
-├── TEAM_STRUCTURE.md             # Team roles
-├── GITHUB_WORKFLOW.md            # Git workflow
 └── CONTRIBUTING.md               # This file
 ```
 
@@ -462,7 +461,7 @@ smartlease-edge-chennai/
    **Logs/Screenshots:**
    [Attach if available]
    ```
-5. Assign to person who owns that component (see TEAM_STRUCTURE.md)
+5. Assign to person who owns that component (see docs/guides/TEAM_STRUCTURE.md)
 6. Add label: `bug`, `high-priority` (if urgent)
 
 ---
@@ -473,10 +472,10 @@ smartlease-edge-chennai/
 
 1. **Check the docs:**
    - `README.md` — Project overview
-   - `TEAM_STRUCTURE.md` — What you should be working on
-   - `GITHUB_WORKFLOW.md` — Git help
-   - `DATA_COLLECTION_GUIDE.md` — Data collection
-   - `ACOUSTIC_RECORDING_CHECKLIST.md` — Recording help
+   - `docs/guides/TEAM_STRUCTURE.md` — What you should be working on
+   - `docs/guides/GITHUB_WORKFLOW.md` — Git help
+   - `docs/guides/DATA_COLLECTION_GUIDE.md` — Data collection
+   - `docs/guides/ACOUSTIC_RECORDING_CHECKLIST.md` — Recording help
 
 2. **Search GitHub Issues:**
    - Maybe someone already solved this?
@@ -520,7 +519,7 @@ smartlease-edge-chennai/
 - **AI/ML models:** Ask Member 1 (AI Engineer)
 - **Android code:** Ask Member 2 (Android Developer)
 - **Demo/docs:** Ask Member 3 (Research & Demo)
-- **Git/GitHub:** Check GITHUB_WORKFLOW.md or ask anyone
+- **Git/GitHub:** Check docs/guides/GITHUB_WORKFLOW.md or ask anyone
 - **General:** Post in group chat
 
 ---

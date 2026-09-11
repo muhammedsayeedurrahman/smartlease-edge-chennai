@@ -3,7 +3,11 @@
     "allow": [
       "Bash(git init *)",
       "Bash(git commit -m ' *)",
-      "Bash(git commit -m 'docs: add GitHub repository link to README *)"
+      "Bash(git commit -m 'docs: add GitHub repository link to README *)",
+      "Artifact",
+      "Bash(git commit -m 'docs: add print-ready team collaboration guide \\(PDF source\\) *)",
+      "Bash(git commit -m 'docs: update README for iQOO Hackathon judges *)",
+      "Bash(git commit -m 'docs: revise README tone for professional technical audience *)"
     ]
   }
 }
