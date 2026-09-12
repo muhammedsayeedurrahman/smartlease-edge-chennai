@@ -2,6 +2,7 @@ package com.smartlease.edge.ui.screens
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -506,32 +507,50 @@ fun WalkthroughScreen(onReportGenerated: (InspectionReport) -> Unit) {
                             // above says: the emitter fired. DeductionEngine's clearedNotes
                             // wording is the one place that gets to say what that does and
                             // does not confirm -- this call site adds no claim of its own.
-                            is IrController.TransmitResult.Success -> logFinding(
-                                type = FindingType.IR_APPLIANCE_CHECK, label = "IR command transmitted", value = "IR sent",
-                                detail = FindingDetail.ApplianceCheck(
-                                    appliance = "${profile.brand} AC", functional = true
-                                ),
-                                noteText = "%s, %d kHz — pattern not verified against this unit".format(
-                                    profile.brand, profile.typicalCarrierHz / 1000
-                                ),
-                                lamp = Lamp.PASS
-                            )
-                            is IrController.TransmitResult.Failure -> logFinding(
-                                type = FindingType.IR_APPLIANCE_CHECK, label = "IR transmit failed", value = "no IR",
-                                detail = FindingDetail.ApplianceCheck(
-                                    appliance = "${profile.brand} AC",
-                                    functional = false,
-                                    // The command never left the device, so this is a tool
-                                    // failure, not a reading on the appliance -- irTransmitted
-                                    // and the reason both have to be persisted, or
-                                    // DeductionEngine and the report have no way to tell this
-                                    // apart from an appliance that was actually checked.
-                                    irTransmitted = false,
-                                    failureReason = result.reason
-                                ),
-                                noteText = result.reason,
-                                lamp = Lamp.CAUTION
-                            )
+                            is IrController.TransmitResult.Success -> {
+                                // Toast confirms only what the hardware call itself reports --
+                                // the emitter fired. It cannot and does not claim the appliance
+                                // reacted; ConsumerIrManager has no receive path to check that.
+                                // A person still has to watch the unit to know if it responded.
+                                Toast.makeText(
+                                    context,
+                                    "IR sent (${profile.brand}, ${profile.typicalCarrierHz / 1000}kHz) — watch the unit, this doesn't confirm it reacted",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                                logFinding(
+                                    type = FindingType.IR_APPLIANCE_CHECK, label = "IR command transmitted", value = "IR sent",
+                                    detail = FindingDetail.ApplianceCheck(
+                                        appliance = "${profile.brand} AC", functional = true
+                                    ),
+                                    noteText = "%s, %d kHz — pattern not verified against this unit".format(
+                                        profile.brand, profile.typicalCarrierHz / 1000
+                                    ),
+                                    lamp = Lamp.PASS
+                                )
+                            }
+                            is IrController.TransmitResult.Failure -> {
+                                Toast.makeText(
+                                    context,
+                                    "IR transmit failed: ${result.reason}",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                                logFinding(
+                                    type = FindingType.IR_APPLIANCE_CHECK, label = "IR transmit failed", value = "no IR",
+                                    detail = FindingDetail.ApplianceCheck(
+                                        appliance = "${profile.brand} AC",
+                                        functional = false,
+                                        // The command never left the device, so this is a tool
+                                        // failure, not a reading on the appliance -- irTransmitted
+                                        // and the reason both have to be persisted, or
+                                        // DeductionEngine and the report have no way to tell this
+                                        // apart from an appliance that was actually checked.
+                                        irTransmitted = false,
+                                        failureReason = result.reason
+                                    ),
+                                    noteText = result.reason,
+                                    lamp = Lamp.CAUTION
+                                )
+                            }
                         }
                     }
                 },
