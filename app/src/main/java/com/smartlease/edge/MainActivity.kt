@@ -22,6 +22,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.smartlease.edge.data.SessionType
+import com.smartlease.edge.narration.ReportNarratorFactory
 import com.smartlease.edge.report.InspectionReport
 import com.smartlease.edge.report.PropertyReportBuilder
 import com.smartlease.edge.report.ReportGenerator
@@ -162,18 +163,30 @@ fun SmartLeaseApp(
                                 sessionId = sessionId,
                                 sessionType = sessionType
                             )
-                            val built = ReportGenerator.buildReport(
-                                sessionId = sessionId,
-                                propertyLabel = property.name,
-                                findings = findings,
-                                depositRupees = PropertyReportBuilder.depositRupeesOrNull(property),
-                                // No baseline: this flow has no stored move-in session to diff
-                                // against yet, so a move-out report prices every finding. That
-                                // is the honest reading of "we have no prior record", not a
-                                // bug, but it is why the move-in/move-out question is asked.
-                                baselineKeys = emptySet(),
-                                sessionType = sessionType
-                            )
+                            // Selected per report rather than held for the process
+                            // lifetime: a loaded Gemma model pins hundreds of megabytes, and
+                            // a rental inspection produces a report every few minutes, not
+                            // every few seconds. Closed in `finally` so a failure part-way
+                            // through cannot leak the native session.
+                            val selection = ReportNarratorFactory.create(context)
+                            val built = try {
+                                ReportGenerator.buildReport(
+                                    sessionId = sessionId,
+                                    propertyLabel = property.name,
+                                    findings = findings,
+                                    depositRupees = PropertyReportBuilder.depositRupeesOrNull(property),
+                                    // No baseline: this flow has no stored move-in session to
+                                    // diff against yet, so a move-out report prices every
+                                    // finding. That is the honest reading of "we have no prior
+                                    // record", not a bug, but it is why the move-in/move-out
+                                    // question is asked.
+                                    baselineKeys = emptySet(),
+                                    sessionType = sessionType,
+                                    narrator = selection.narrator
+                                )
+                            } finally {
+                                selection.narrator.close()
+                            }
                             ReportGenerator.renderToPdf(context, built)
                             built
                         }

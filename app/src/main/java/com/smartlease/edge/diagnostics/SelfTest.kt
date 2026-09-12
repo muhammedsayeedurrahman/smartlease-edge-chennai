@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.Debug
 import android.os.PowerManager
 import com.smartlease.edge.acoustic.AcousticModelBundle
+import com.smartlease.edge.narration.ReportNarratorFactory
 import com.smartlease.edge.acoustic.AcousticFeatureExtractor
 import com.smartlease.edge.vision.DefectSegmenterFactory
 import com.smartlease.edge.vision.YoloSegConfig
@@ -324,7 +325,11 @@ object SelfTest {
             }
         }
 
-        rows += "report narrative" to "rule-based templating - no LLM in this build"
+        // Asks what this device is actually set up for rather than printing a constant.
+        // The old line said "no LLM in this build" unconditionally, which would have gone on
+        // lying the moment the weights were pushed. `describe` rather than `create`: this
+        // screen must not load half a gigabyte of weights to render a row.
+        rows += "report narrative" to ReportNarratorFactory.describe(context)
         rows += "NPU / HTP" to "NOT USED. All inference above is on the CPU via PyTorch Lite / Kotlin."
         rows += "peak heap" to try {
             "${(Debug.getNativeHeapAllocatedSize() / (1024 * 1024))} MB native heap allocated"

@@ -116,6 +116,12 @@ dependencies {
     implementation(libs.pytorch.android.lite)
     implementation(libs.pytorch.torchvision.lite)
 
+    // On-device report narration (com.smartlease.edge.narration). Runtime only: the Gemma
+    // weights are not in the APK and are not redistributed with it -- see docs/GEMMA_SETUP.md.
+    // The app builds, installs and produces reports with no model file present; narration
+    // falls back to rule-based templating and says so on the page.
+    implementation(libs.mediapipe.tasks.genai)
+
     // Backend sync client (com.smartlease.edge.sync) -- uploads a digest + metadata only.
     implementation(libs.retrofit.core)
     implementation(libs.retrofit.kotlinx.serialization.converter)

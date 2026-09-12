@@ -14,6 +14,9 @@ import com.smartlease.edge.data.SessionType
 import com.smartlease.edge.deduction.DeductionEngine
 import com.smartlease.edge.deduction.DeductionLine
 import com.smartlease.edge.deduction.DeductionSummary
+import com.smartlease.edge.narration.NarrationSource
+import com.smartlease.edge.narration.ReportNarrator
+import com.smartlease.edge.narration.TemplateReportNarrator
 import com.smartlease.edge.sync.buildTimeSyncConfig
 import java.io.File
 import java.io.FileOutputStream
@@ -33,8 +36,11 @@ import java.util.Locale
  * `System.currentTimeMillis()`, which a user can move. Two on-screen signature captures
  * rendered below the digest are the next step; until they exist, do not say "signed".
  *
- * `synthesizeNarrative()` is rule-based templating. It is not an LLM and the report does
- * not claim it is.
+ * Section prose comes from a [ReportNarrator]. Which one ran is recorded on each section
+ * and printed on the PDF: rule-based templating and an on-device Gemma model produce
+ * different kinds of claim, and the reader is told which they are holding rather than left
+ * to assume. [buildReport] defaults to the template narrator, so a caller that does not opt
+ * in gets the deterministic path.
  */
 object ReportGenerator {
 
@@ -52,19 +58,27 @@ object ReportGenerator {
      * @param sessionType which kind of walkthrough this is -- carried onto
      * [InspectionReport.sessionType] so a later sync upload reports the real session type
      * instead of a guess.
+     * @param narrator writes each section's prose. Defaults to [TemplateReportNarrator] so
+     * that every existing call site keeps the deterministic behaviour it had; a caller that
+     * wants model narration passes the one [com.smartlease.edge.narration.ReportNarratorFactory]
+     * selected for this device.
      */
-    fun buildReport(
+    suspend fun buildReport(
         sessionId: String,
         propertyLabel: String,
         findings: List<InspectionEntity>,
         depositRupees: Int? = null,
         baselineKeys: Set<String> = emptySet(),
-        sessionType: SessionType = SessionType.MOVE_OUT
+        sessionType: SessionType = SessionType.MOVE_OUT,
+        narrator: ReportNarrator = TemplateReportNarrator
     ): InspectionReport {
         val sections = findings.groupBy { it.findingType }.map { (type, items) ->
+            val title = type.name.replace('_', ' ')
+            val narration = narrator.narrate(title, items)
             ReportSection(
-                title = type.name.replace('_', ' '),
-                body = synthesizeNarrative(type, items)
+                title = title,
+                body = narration.text,
+                narrationSource = narration.source
             )
         }
 
@@ -90,21 +104,21 @@ object ReportGenerator {
         )
     }
 
+
     /**
-     * PLACEHOLDER for the GenieX/Llama-3.2 on-device synthesis step. Produces real,
-     * readable, structurally-correct report prose today via rule-based templating, so the
-     * full report pipeline works end-to-end now — swap this function body for a GenieX
-     * call once that SDK is wired in, without changing the PDF renderer below.
+     * The one-line credit printed under a section's prose.
+     *
+     * The template wording says what it is rather than apologising for it: assembled text
+     * cannot describe a finding that was not recorded, which on this document is a property
+     * worth stating, not a limitation to hide. The Gemma wording names the audit, because an
+     * unaudited model paragraph and an audited one are not the same artefact.
      */
-    private fun synthesizeNarrative(
-        type: com.smartlease.edge.data.FindingType,
-        items: List<InspectionEntity>
-    ): String {
-        val count = items.size
-        val severities = items.groupingBy { it.severity }.eachCount()
-        val labels = items.joinToString("; ") { it.label }
-        return "$count finding(s) recorded. Items: $labels. " +
-                "Severity breakdown: $severities."
+    internal fun narrationCredit(source: NarrationSource): String = when (source) {
+        NarrationSource.TEMPLATE ->
+            "Written by rule from the findings above -- no language model involved."
+        NarrationSource.GEMMA ->
+            "Written by an on-device Gemma model from the findings above, and checked against " +
+                "them before printing. No text left this phone."
     }
 
     /**
@@ -166,7 +180,21 @@ object ReportGenerator {
             canvas.translate(MARGIN.toFloat(), y)
             layout.draw(canvas)
             canvas.restore()
-            y += layout.height + 16
+            y += layout.height + 4
+
+            // Attribution under the paragraph, not buried in a footnote. "A model wrote this"
+            // and "a format string wrote this" are different claims about a document that
+            // prices a deposit, and the reader should not have to guess which one they have.
+            // Printed for BOTH sources: labelling only the model-written case would make the
+            // unlabelled case ambiguous, which is the same problem one layer down.
+            // `drawText` places the BASELINE at y, so the glyphs rise above it. Advancing by
+            // the ascent first keeps the credit clear of the paragraph's last line; the
+            // descent plus a gap afterwards keeps the next heading off it. Without this the
+            // credit collided with both, which was visible on the first rendered report.
+            val creditMetrics = metaPaint.fontMetrics
+            y += -creditMetrics.ascent + 2
+            canvas.drawText(narrationCredit(section.narrationSource), MARGIN.toFloat(), y, metaPaint)
+            y += creditMetrics.descent + 14
         }
 
         // Deposit balance sheet, when a deposit was recorded for this session. Placed after

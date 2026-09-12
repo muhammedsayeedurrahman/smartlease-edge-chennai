@@ -2,8 +2,18 @@ package com.smartlease.edge.report
 
 import com.smartlease.edge.data.SessionType
 import com.smartlease.edge.deduction.DeductionSummary
+import com.smartlease.edge.narration.NarrationSource
 
-data class ReportSection(val title: String, val body: String)
+/**
+ * @param narrationSource who wrote [body]. Carried onto the section rather than inferred at
+ * render time, because the PDF states it to the reader and a report must not be able to
+ * describe its own prose as model-written after falling back to a template.
+ */
+data class ReportSection(
+    val title: String,
+    val body: String,
+    val narrationSource: NarrationSource = NarrationSource.TEMPLATE
+)
 
 data class InspectionReport(
     val sessionId: String,
