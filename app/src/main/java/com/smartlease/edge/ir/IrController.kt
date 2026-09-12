@@ -68,6 +68,34 @@ object CommonAcIrProfiles {
         Profile("Blue Star", 38000, "NEC-family remotes typical; verify on-site"),
         Profile("LG", 38000, "Often full-state burst protocol; verify on-site"),
         Profile("Daikin", 38000, "Often full-state burst protocol; verify on-site"),
-        Profile("Hitachi", 38000, "Verify on-site — protocol varies by model year")
+        Profile("Hitachi", 38000, "Verify on-site — protocol varies by model year"),
+        Profile(
+            "O General (candidate — see FujitsuAcCandidateTiming)",
+            38000,
+            "2026-09-12 venue lead: remote in hand reads model \"YY-107A\"; a third-party " +
+                "reseller listing (not the manufacturer) advertises it as O General-compatible. " +
+                "O General ACs commonly use the Fujitsu_AC protocol family. UNVERIFIED against " +
+                "this unit — do not claim this works until it has actually been tested."
+        )
     )
+}
+
+/**
+ * Real, published Fujitsu_AC protocol timing constants, sourced from the open-source
+ * IRremoteESP8266 library (crankyoldgit/IRremoteESP8266, src/ir_Fujitsu.cpp/.h) — not
+ * invented. Carried here only as reference data for a candidate O General match (see the
+ * profile above); deliberately NOT wired into [IrController.transmit] because the full
+ * 16-byte state payload (mode/temp/checksum bit layout) is not reproduced here and has not
+ * been independently verified. Do not synthesize a raw pattern from these constants and
+ * present it as a working AC command without testing it against a real unit first.
+ */
+object FujitsuAcCandidateTiming {
+    const val CARRIER_HZ = 38000
+    const val HDR_MARK_US = 3324
+    const val HDR_SPACE_US = 1574
+    const val BIT_MARK_US = 448
+    const val ONE_SPACE_US = 1182
+    const val ZERO_SPACE_US = 390
+    const val MIN_GAP_US = 8100
+    const val SOURCE = "github.com/crankyoldgit/IRremoteESP8266 src/ir_Fujitsu.h,.cpp (2026-09-12)"
 }
