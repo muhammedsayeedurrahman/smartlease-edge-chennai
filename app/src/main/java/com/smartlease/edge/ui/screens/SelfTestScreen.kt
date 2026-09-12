@@ -10,6 +10,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -40,6 +41,7 @@ fun SelfTestScreen(onBack: () -> Unit) {
     var running by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<String?>(null) }
     var irCandidateStatus by remember { mutableStateOf<String?>(null) }
+    var irCandidateIsSimulated by remember { mutableStateOf(false) }
 
     fun run() {
         scope.launch {
@@ -109,12 +111,14 @@ fun SelfTestScreen(onBack: () -> Unit) {
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(enabled = irController.hasIrBlaster, onClick = {
+                irCandidateIsSimulated = false
                 irCandidateStatus = when (val r = irController.transmitFujitsuCandidate(turnOn = true)) {
                     is IrController.TransmitResult.Success -> "Sent candidate ON frame — did the AC react?"
                     is IrController.TransmitResult.Failure -> "Failed: ${r.reason}"
                 }
             }) { Text("Send candidate ON") }
             OutlinedButton(enabled = irController.hasIrBlaster, onClick = {
+                irCandidateIsSimulated = false
                 irCandidateStatus = when (val r = irController.transmitFujitsuCandidate(turnOn = false)) {
                     is IrController.TransmitResult.Success -> "Sent candidate OFF frame — did the AC react?"
                     is IrController.TransmitResult.Failure -> "Failed: ${r.reason}"
@@ -124,7 +128,26 @@ fun SelfTestScreen(onBack: () -> Unit) {
         if (!irController.hasIrBlaster) {
             Text("No IR blaster detected on this device.", fontSize = 10.sp)
         }
-        irCandidateStatus?.let { Text(it, fontSize = 11.sp) }
+        irCandidateStatus?.let {
+            Text(
+                it,
+                fontSize = 11.sp,
+                color = if (irCandidateIsSimulated) Color(0xFFB8860B) else Color.Unspecified,
+                fontWeight = if (irCandidateIsSimulated) FontWeight.Bold else FontWeight.Normal
+            )
+        }
+
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Rehearsal display only — does not transmit anything and is not a claim the AC " +
+                    "responded. Never show this as a real result to a judge; it exists purely " +
+                    "so the walkthrough UI/flow can be rehearsed before the pattern is verified.",
+            fontSize = 10.sp
+        )
+        OutlinedButton(onClick = {
+            irCandidateIsSimulated = true
+            irCandidateStatus = "[SIMULATED — NOT a real AC response] AC acknowledged: power toggled."
+        }) { Text("Simulate result (rehearsal only)") }
 
         Spacer(Modifier.height(10.dp))
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
