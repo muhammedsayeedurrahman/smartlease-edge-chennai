@@ -3,6 +3,7 @@ package com.smartlease.edge.camera
 import android.content.Context
 import android.graphics.Bitmap
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
@@ -26,7 +27,13 @@ class CameraController(
 ) {
     private var imageCapture: ImageCapture? = null
 
-    suspend fun bindTo(previewView: PreviewView) {
+    /**
+     * @param analyzer when non-null, also binds an [ImageAnalysis] use case (used by the 360
+     *        auto-capture flow to read frames for heading/sharpness gating) alongside preview
+     *        and still capture. Passing a different analyzer instance, or null, rebinds — the
+     *        walkthrough screen does this each time auto-capture mode is toggled.
+     */
+    suspend fun bindTo(previewView: PreviewView, analyzer: ImageAnalysis.Analyzer? = null) {
         val provider = getCameraProvider()
 
         val preview = Preview.Builder().build().also {
@@ -37,9 +44,19 @@ class CameraController(
             .build()
 
         provider.unbindAll()
-        provider.bindToLifecycle(
-            lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, capture
-        )
+        if (analyzer != null) {
+            val analysis = ImageAnalysis.Builder()
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .build()
+                .also { it.setAnalyzer(ContextCompat.getMainExecutor(context), analyzer) }
+            provider.bindToLifecycle(
+                lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, capture, analysis
+            )
+        } else {
+            provider.bindToLifecycle(
+                lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, capture
+            )
+        }
         imageCapture = capture
     }
 

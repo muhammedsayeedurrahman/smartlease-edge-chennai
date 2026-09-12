@@ -46,6 +46,9 @@ import com.smartlease.edge.ui.theme.ReadoutValue
 import com.smartlease.edge.ui.theme.ReadoutValueLarge
 import com.smartlease.edge.vision.DefectSegmenter
 import com.smartlease.edge.vision.DefectSegmenterFactory
+import com.smartlease.edge.inspection360.HeadingTracker
+import com.smartlease.edge.inspection360.RoomInspectionCoordinator
+import com.smartlease.edge.inspection360.WallInspectionAnalyzer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -100,6 +103,12 @@ fun WalkthroughScreen(onReportGenerated: (InspectionReport) -> Unit) {
     var findings by remember { mutableStateOf(listOf<LoggedFinding>()) }
     var lastSafetyVerdict by remember { mutableStateOf<SafetyGate.Verdict?>(null) }
     var busy by remember { mutableStateOf(false) }
+
+    // 360 auto-capture: walks the 4 compass quadrants, gated on device steadiness (gyro) and
+    // frame sharpness (Laplacian variance), firing one defect-segmenter pass per wall. Needs
+    // the same DefectSegmenter as manual capture, so it can't exist until models finish loading.
+    var isAutoCaptureMode by remember { mutableStateOf(false) }
+    var isMovingTooFast by remember { mutableStateOf(false) }
 
     // Nothing else in the app has a source for the deposit -- DeductionEngine needs a
     // rupee figure to subtract findings from, and until now nothing ever supplied one.
@@ -174,6 +183,54 @@ fun WalkthroughScreen(onReportGenerated: (InspectionReport) -> Unit) {
         }
     }
 
+    // Built once the segmenter finishes loading, not before -- RoomInspectionCoordinator needs
+    // a real DefectSegmenter, not the nullable one manual capture tolerates. logFinding is a
+    // suspend fun, so the coordinator's plain-lambda callback hops into scope.launch to call it,
+    // same pattern as "Set baseline" below.
+    val roomCoordinator = remember(visionSegmenter) {
+        val segmenter = visionSegmenter ?: return@remember null
+        RoomInspectionCoordinator(segmenter) { records ->
+            isAutoCaptureMode = false
+            scope.launch {
+                records.forEach { record ->
+                    if (record.defectClass == "CLEAR") {
+                        findings = findings + LoggedFinding(
+                            Lamp.PASS, record.wall, "clear", "Nothing flagged on this wall"
+                        )
+                    } else {
+                        logFinding(
+                            type = FindingType.VISUAL_DEFECT,
+                            label = "${record.wall}: ${record.defectClass}",
+                            value = "%.2f sq ft".format(record.areaSqFt),
+                            detail = FindingDetail.VisualDefect(
+                                defectClass = record.defectClass,
+                                areaSqFt = record.areaSqFt,
+                                confidence = record.confidence,
+                                fromTrainedModel = segmenter.isTrainedModel
+                            ),
+                            noteText = "360 auto-capture, %.0f%% confidence".format(record.confidence * 100f),
+                            lamp = if (record.confidence >= 0.6f) Lamp.FLAG else Lamp.CAUTION
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    val wallAnalyzer = remember(roomCoordinator) {
+        val coordinator = roomCoordinator ?: return@remember null
+        val tracker = HeadingTracker(context) { _, _ -> } // quadrant read internally per-frame
+        WallInspectionAnalyzer(
+            headingTracker = tracker,
+            onWallCaptured = { quad, bmp, z -> coordinator.onWallKeyframeAcquired(quad, bmp, z) },
+            onSpeedWarning = { movingTooFast -> isMovingTooFast = movingTooFast }
+        )
+    }
+
+    DisposableEffect(wallAnalyzer) {
+        onDispose { wallAnalyzer?.stop() }
+    }
+
     val insets = WindowInsets.systemBars.asPaddingValues()
 
     Column(
@@ -226,7 +283,8 @@ fun WalkthroughScreen(onReportGenerated: (InspectionReport) -> Unit) {
                     update = { previewView ->
                         scope.launch {
                             try {
-                                cameraController.bindTo(previewView)
+                                val analyzerToBind = if (isAutoCaptureMode) wallAnalyzer else null
+                                cameraController.bindTo(previewView, analyzerToBind)
                             } catch (e: Exception) {
                                 // Another app holding the camera would otherwise crash the
                                 // walkthrough the moment this screen composes.
@@ -248,6 +306,22 @@ fun WalkthroughScreen(onReportGenerated: (InspectionReport) -> Unit) {
             // The one bold element on this screen: how square the phone is to the wall. It is
             // what the person is actively adjusting, so it is the largest thing here, on a
             // scrim so it stays legible against both a white wall and a dark corner.
+            if (isAutoCaptureMode) {
+                Row(
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 16.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (isMovingTooFast) Color.Red.copy(alpha = 0.8f) else Color(0xFF2E7D32).copy(alpha = 0.85f))
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        if (isMovingTooFast) "SLOW DOWN TO CAPTURE" else "AUTO-CAPTURING 360 -- turn slowly",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.White
+                    )
+                }
+            } else {
             alignmentState?.let { s ->
                 val delta = s.deltaFromBaselineDeg
                 val lamp = when {
@@ -297,6 +371,7 @@ fun WalkthroughScreen(onReportGenerated: (InspectionReport) -> Unit) {
                     }
                 }
             }
+            }
         }
 
         if (modelsLoading) {
@@ -322,8 +397,9 @@ fun WalkthroughScreen(onReportGenerated: (InspectionReport) -> Unit) {
             // Gated on the permission, not just on `busy`: without CAMERA the PreviewView
             // above is never composed, so bindTo() never runs and captureBitmap() throws
             // IllegalStateException into a coroutine with nothing to catch it.
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
-                enabled = !busy && !modelsLoading && hasCameraPermission,
+                enabled = !busy && !modelsLoading && hasCameraPermission && !isAutoCaptureMode,
                 onClick = {
                     scope.launch {
                         busy = true
@@ -382,7 +458,7 @@ fun WalkthroughScreen(onReportGenerated: (InspectionReport) -> Unit) {
                         }
                     }
                 },
-                modifier = Modifier.fillMaxWidth().height(52.dp)
+                modifier = Modifier.weight(1f).height(52.dp)
             ) {
                 Text(
                     when {
@@ -393,6 +469,25 @@ fun WalkthroughScreen(onReportGenerated: (InspectionReport) -> Unit) {
                     },
                     style = MaterialTheme.typography.titleMedium
                 )
+            }
+
+            OutlinedButton(
+                enabled = !busy && !modelsLoading && hasCameraPermission && wallAnalyzer != null,
+                onClick = {
+                    isAutoCaptureMode = !isAutoCaptureMode
+                    if (isAutoCaptureMode) wallAnalyzer?.reset()
+                },
+                modifier = Modifier.weight(1f).height(52.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = if (isAutoCaptureMode) MaterialTheme.colorScheme.error
+                        else MaterialTheme.colorScheme.onBackground
+                )
+            ) {
+                Text(
+                    if (isAutoCaptureMode) "Stop 360" else "Start 360",
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
             }
 
             Spacer(Modifier.height(8.dp))
