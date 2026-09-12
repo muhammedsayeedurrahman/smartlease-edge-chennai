@@ -44,8 +44,14 @@ object DeductionEngine {
                         if (!isPriceable(detail)) add(reviewNote(detail))
                     is FindingDetail.AcousticTap ->
                         if (detail.verdict != HOLLOW) add(tapNote(detail))
-                    is FindingDetail.ApplianceCheck ->
-                        if (detail.functional) add("${detail.appliance}: responded to IR command — functional, no deduction.")
+                    is FindingDetail.ApplianceCheck -> when {
+                        !detail.irTransmitted -> add(applianceNotAssessedNote(detail))
+                        detail.functional -> add(
+                            "${detail.appliance}: IR command transmitted — response not verified " +
+                                "(Android cannot receive IR), no deduction."
+                        )
+                        else -> Unit
+                    }
                     else -> Unit
                 }
             }
@@ -102,13 +108,26 @@ object DeductionEngine {
         "Acoustic tap test returned hollow (decay/frequency heuristic -- no confidence score)"
     }
 
+    /**
+     * A tool failure is not evidence about the appliance. `irTransmitted = false` means the
+     * IR command never left the device -- nothing was ever asked to respond, so there is
+     * nothing here to bill. That case is routed to [applianceNotAssessedNote] instead; this
+     * function only ever prices a check where the command actually went out.
+     */
     private fun applianceLine(d: FindingDetail.ApplianceCheck): DeductionLine? {
+        if (!d.irTransmitted) return null
         if (d.functional) return null
         return DeductionLine(
             description = "${d.appliance} not functional",
             basis = "Did not respond to IR command during inspection · service call",
             amountRupees = RepairTariff.APPLIANCE_NOT_FUNCTIONAL_RUPEES
         )
+    }
+
+    private fun applianceNotAssessedNote(d: FindingDetail.ApplianceCheck): String {
+        val reasonSuffix = d.failureReason?.let { " ($it)" }.orEmpty()
+        return "${d.appliance}: IR command could not be transmitted$reasonSuffix — " +
+            "condition was not determined, no deduction."
     }
 
     private fun reviewNote(d: FindingDetail.VisualDefect): String = when {

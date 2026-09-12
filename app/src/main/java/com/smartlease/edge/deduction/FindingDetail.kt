@@ -45,12 +45,27 @@ sealed interface FindingDetail {
 
     data class ApplianceCheck(
         val appliance: String,
-        val functional: Boolean
+        val functional: Boolean,
+        /**
+         * False when the IR command was never actually sent -- e.g. `transmit()` threw before
+         * any signal left the device. `functional` alone cannot express this: it is a claim
+         * about the appliance, and a tool failure is not evidence about the appliance at all.
+         * Defaults to true because the success call site never had to think about this. A row
+         * persisted before this field existed has no key for it, but is not ambiguous: the
+         * only two writers back then were the success branch (`functional = true`) and the
+         * failure branch (`functional = false`), so a legacy row's `irTransmitted` is recovered
+         * from its own `functional` value rather than assumed true.
+         */
+        val irTransmitted: Boolean = true,
+        /** Why `transmit()` failed, when [irTransmitted] is false. Null otherwise. */
+        val failureReason: String? = null
     ) : FindingDetail {
         override fun toJson(): String = JSONObject()
             .put(KEY_KIND, KIND_APPLIANCE)
             .put("appliance", appliance)
             .put("functional", functional)
+            .put("irTransmitted", irTransmitted)
+            .put("failureReason", failureReason)
             .toString()
     }
 
@@ -92,10 +107,20 @@ sealed interface FindingDetail {
                     confidence = obj.optDouble("confidence", 0.0).toFloat(),
                     fromTrainedModel = obj.optBoolean("fromTrainedModel", false)
                 )
-                KIND_APPLIANCE -> ApplianceCheck(
-                    appliance = obj.optString("appliance"),
-                    functional = obj.optBoolean("functional", false)
-                )
+                KIND_APPLIANCE -> {
+                    val functional = obj.optBoolean("functional", false)
+                    ApplianceCheck(
+                        appliance = obj.optString("appliance"),
+                        functional = functional,
+                        // A legacy row (key absent) only ever came from one of two writers, and
+                        // functional = false only ever came from the failure branch -- so the
+                        // row's own functional value is the correct stand-in for irTransmitted.
+                        irTransmitted = obj.optBoolean("irTransmitted", functional),
+                        // opt() returns null both when the key is absent (legacy rows) and when a
+                        // successful transmit stored no reason -- both cases mean "no reason".
+                        failureReason = obj.opt("failureReason") as? String
+                    )
+                }
                 KIND_NOTE -> Note(obj.optString("text"))
                 else -> null
             }

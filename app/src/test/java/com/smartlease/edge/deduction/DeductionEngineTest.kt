@@ -139,19 +139,105 @@ class DeductionEngineTest {
     }
 
     @Test
-    fun `a non-functional appliance is priced, a functional one is not`() {
-        val broken = DeductionEngine.summarise(
+    fun `a failed IR transmit produces no deduction and a note that the appliance was not assessed`() {
+        val summary = DeductionEngine.summarise(
             DEPOSIT,
-            listOf(entity(FindingDetail.ApplianceCheck("Voltas AC", functional = false), FindingType.IR_APPLIANCE_CHECK))
+            listOf(
+                entity(
+                    FindingDetail.ApplianceCheck(
+                        appliance = "Voltas AC",
+                        functional = false,
+                        irTransmitted = false,
+                        failureReason = "No ConsumerIrManager available on this device"
+                    ),
+                    FindingType.IR_APPLIANCE_CHECK
+                )
+            )
         )
-        assertEquals(1, broken.lines.size)
-        assertEquals(RepairTariff.APPLIANCE_NOT_FUNCTIONAL_RUPEES, broken.lines[0].amountRupees)
 
-        val working = DeductionEngine.summarise(
+        // A tool failure is not evidence about the appliance -- it must never reach the
+        // balance sheet, only the review notes.
+        assertTrue(summary.lines.isEmpty())
+        assertEquals(1, summary.clearedNotes.size)
+        val note = summary.clearedNotes[0]
+        assertTrue("note should say the command could not be transmitted: $note", note.contains("could not be transmitted"))
+        assertTrue(
+            "note should carry the failure reason: $note",
+            note.contains("No ConsumerIrManager available on this device")
+        )
+    }
+
+    @Test
+    fun `a legacy failed appliance check row recovered from the device's Room DB produces no deduction`() {
+        // The exact row this regression is about: a functional = false appliance_check
+        // persisted before irTransmitted existed. It must infer irTransmitted = false (the
+        // command was never sent) and therefore must not produce the bogus "not functional"
+        // deduction.
+        val findings = listOf(
+            InspectionEntity(
+                sessionId = SESSION,
+                timestampEpochMillis = 1_757_000_000_000L,
+                findingType = FindingType.IR_APPLIANCE_CHECK,
+                label = "test finding",
+                detailJson = """{"kind":"appliance_check","appliance":"Voltas AC","functional":false}""",
+                severity = Severity.INFO
+            )
+        )
+
+        val summary = DeductionEngine.summarise(DEPOSIT, findings)
+
+        assertTrue(summary.lines.isEmpty())
+    }
+
+    @Test
+    fun `a successful IR transmit still produces no deduction`() {
+        val summary = DeductionEngine.summarise(
             DEPOSIT,
             listOf(entity(FindingDetail.ApplianceCheck("Voltas AC", functional = true), FindingType.IR_APPLIANCE_CHECK))
         )
-        assertTrue(working.lines.isEmpty())
+
+        assertTrue(summary.lines.isEmpty())
+    }
+
+    @Test
+    fun `a successful IR transmit's cleared note honestly claims only that the command was sent, not that the appliance responded`() {
+        // ConsumerIrManager is transmit-only (see IrController) -- Android has no API to
+        // receive or decode an IR signal, so "functional = true" from a Success transmit means
+        // only that the emitter fired. This is the one sentence that gets to say what that
+        // does and does not confirm, and it must never claim the appliance "responded".
+        val summary = DeductionEngine.summarise(
+            DEPOSIT,
+            listOf(entity(FindingDetail.ApplianceCheck("Voltas AC", functional = true), FindingType.IR_APPLIANCE_CHECK))
+        )
+
+        val note = summary.clearedNotes.single()
+        assertTrue("note must not claim the appliance responded: $note", !note.contains("responded"))
+        assertTrue(
+            "note should say the command was transmitted: $note",
+            note.contains("transmitted")
+        )
+        assertTrue(
+            "note should say the response was not verified: $note",
+            note.contains("not verified")
+        )
+    }
+
+    @Test
+    fun `the failure reason survives the appliance check round trip into the balance sheet`() {
+        val original = FindingDetail.ApplianceCheck(
+            appliance = "Voltas AC",
+            functional = false,
+            irTransmitted = false,
+            failureReason = "Device reports no IR emitter hardware"
+        )
+
+        val summary = DeductionEngine.summarise(
+            DEPOSIT,
+            listOf(entity(original, FindingType.IR_APPLIANCE_CHECK))
+        )
+
+        assertTrue(summary.lines.isEmpty())
+        assertTrue(summary.clearedNotes.single().contains("Device reports no IR emitter hardware"))
     }
 
     @Test

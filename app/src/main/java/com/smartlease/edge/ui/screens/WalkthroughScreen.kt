@@ -519,7 +519,15 @@ fun WalkthroughScreen(onReportGenerated: (InspectionReport) -> Unit) {
                             is IrController.TransmitResult.Failure -> logFinding(
                                 type = FindingType.IR_APPLIANCE_CHECK, label = "IR transmit failed", value = "no IR",
                                 detail = FindingDetail.ApplianceCheck(
-                                    appliance = "${profile.brand} AC", functional = false
+                                    appliance = "${profile.brand} AC",
+                                    functional = false,
+                                    // The command never left the device, so this is a tool
+                                    // failure, not a reading on the appliance -- irTransmitted
+                                    // and the reason both have to be persisted, or
+                                    // DeductionEngine and the report have no way to tell this
+                                    // apart from an appliance that was actually checked.
+                                    irTransmitted = false,
+                                    failureReason = result.reason
                                 ),
                                 noteText = result.reason,
                                 lamp = Lamp.CAUTION

@@ -49,6 +49,52 @@ class FindingDetailTest {
     }
 
     @Test
+    fun `appliance check with a failed transmit round-trips irTransmitted and the failure reason`() {
+        val original = FindingDetail.ApplianceCheck(
+            appliance = "Voltas AC",
+            functional = false,
+            irTransmitted = false,
+            failureReason = "No ConsumerIrManager available on this device"
+        )
+
+        val restored = FindingDetail.fromJson(original.toJson())
+
+        assertEquals(original, restored)
+    }
+
+    @Test
+    fun `a legacy failed appliance check payload without irTransmitted infers the command was never sent`() {
+        // Rows persisted before irTransmitted existed had exactly two writers: Success (wrote
+        // functional = true) and Failure (wrote functional = false). A legacy row with
+        // functional = false can therefore only have come from the Failure branch, so the
+        // command was never transmitted -- defaulting to true here would fabricate a
+        // transmission that never happened and re-open the bogus "not functional" deduction.
+        val restored = FindingDetail.fromJson(
+            """{"kind":"appliance_check","appliance":"Voltas AC","functional":false}"""
+        )
+
+        assertEquals(
+            FindingDetail.ApplianceCheck(appliance = "Voltas AC", functional = false, irTransmitted = false),
+            restored
+        )
+    }
+
+    @Test
+    fun `a legacy successful appliance check payload without irTransmitted defaults to transmitted`() {
+        // The only other legacy writer was the Success branch, which wrote functional = true
+        // and always sent the command -- so a legacy row with functional = true still defaults
+        // irTransmitted to true.
+        val restored = FindingDetail.fromJson(
+            """{"kind":"appliance_check","appliance":"Voltas AC","functional":true}"""
+        )
+
+        assertEquals(
+            FindingDetail.ApplianceCheck(appliance = "Voltas AC", functional = true, irTransmitted = true),
+            restored
+        )
+    }
+
+    @Test
     fun `note round-trips through json`() {
         val original = FindingDetail.Note(text = "pitch 2, roll -1. Held in memory for this session only.")
 

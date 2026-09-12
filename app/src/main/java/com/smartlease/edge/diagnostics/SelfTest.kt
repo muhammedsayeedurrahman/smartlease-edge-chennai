@@ -94,6 +94,15 @@ object SelfTest {
         val hasEmitter = try { mgr?.hasIrEmitter() == true } catch (e: Exception) { false }
         rows += "hasIrEmitter()" to if (hasEmitter) "true" else "false"
 
+        // hasIrEmitter() only says the hardware exists -- it says nothing about whether
+        // transmit() can actually be called. TRANSMIT_IR is what transmit() checks, and its
+        // absence is exactly what made every transmit() throw SecurityException on a device
+        // that does have the emitter (see the manifest comment next to this permission).
+        val hasTransmitPermission = context.checkSelfPermission(
+            android.Manifest.permission.TRANSMIT_IR
+        ) == PackageManager.PERMISSION_GRANTED
+        rows += "TRANSMIT_IR permission" to if (hasTransmitPermission) "GRANTED" else "NOT GRANTED"
+
         rows += "carrier frequencies" to if (!hasEmitter) {
             "$UNAVAILABLE (no emitter)"
         } else {
@@ -115,10 +124,15 @@ object SelfTest {
             } catch (e: Exception) { UNAVAILABLE }
         }
 
-        rows += "app behaviour here" to if (hasEmitter) {
-            "IR trigger will transmit. Pattern is an unverified NEC header - the report says so."
-        } else {
-            "IR button reads 'No IR blaster detected' and logs a Failure. Degrades visibly, not silently."
+        rows += "app behaviour here" to when {
+            !hasEmitter ->
+                "IR button reads 'No IR blaster detected' and logs a Failure. Degrades visibly, not silently."
+            !hasTransmitPermission ->
+                "IR button will call transmit() without TRANSMIT_IR declared -- ConsumerIrManager " +
+                    "throws SecurityException, IrController catches it and logs a Failure. " +
+                    "Degrades visibly, not silently, but nothing will actually transmit."
+            else ->
+                "IR trigger will transmit. Pattern is an unverified NEC header - the report says so."
         }
         return Section("INFRARED", rows)
     }
