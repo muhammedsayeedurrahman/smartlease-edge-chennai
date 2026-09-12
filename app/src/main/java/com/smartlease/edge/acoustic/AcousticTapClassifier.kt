@@ -37,7 +37,15 @@ object AcousticTapClassifier {
         val peakDb: Float,
         val decayMillis: Float,
         val highFreqRatio: Float,
-        val confidenceNote: String
+        val confidenceNote: String,
+        /**
+         * The trained model's raw P(hollow), carried through so a caller can report an
+         * honest confidence rather than inventing one. Null whenever this verdict did not
+         * come from the trained model -- no model shipped, or [TrainedTapClassifier.classify]
+         * declined to score the clip -- in which case the heuristic decided and there is no
+         * probability to report at all.
+         */
+        val hollowProbability: Float? = null
     )
 
     /** The capture rate every path in this app uses. Training data must be recorded at it. */
@@ -165,7 +173,8 @@ object AcousticTapClassifier {
                 peakDb = peakDb,
                 decayMillis = decayMillis,
                 highFreqRatio = highFreqRatio,
-                confidenceNote = modelVerdict.note
+                confidenceNote = modelVerdict.note,
+                hollowProbability = modelVerdict.hollowProbability
             )
         }
 

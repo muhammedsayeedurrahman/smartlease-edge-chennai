@@ -83,10 +83,23 @@ object DeductionEngine {
         if (d.verdict != HOLLOW) return null
         return DeductionLine(
             description = "Hollow tile",
-            basis = "Acoustic tap test returned hollow at %.0f%% confidence · lift and re-bed one tile"
-                .format(d.confidence * 100f),
+            basis = "${tapConfidenceBasis(d)} · lift and re-bed one tile",
             amountRupees = RepairTariff.HOLLOW_TILE_RUPEES
         )
+    }
+
+    /**
+     * A hollow verdict bills the same [RepairTariff.HOLLOW_TILE_RUPEES] regardless of source,
+     * but what the sentence says about it must not overstate either direction: a heuristic
+     * reading has no real probability behind it, so printing "0% confidence" would understate
+     * it exactly as much as inventing a number would overstate a trained one. Say which
+     * measurement produced the verdict instead of forcing both down the same
+     * percentage-confidence sentence.
+     */
+    private fun tapConfidenceBasis(d: FindingDetail.AcousticTap): String = if (d.fromTrainedModel) {
+        "Acoustic tap test returned hollow at %.0f%% confidence".format(d.confidence * 100f)
+    } else {
+        "Acoustic tap test returned hollow (decay/frequency heuristic -- no confidence score)"
     }
 
     private fun applianceLine(d: FindingDetail.ApplianceCheck): DeductionLine? {

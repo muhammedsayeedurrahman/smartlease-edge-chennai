@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -17,6 +18,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -29,6 +31,7 @@ import com.smartlease.edge.data.AppDatabase
 import com.smartlease.edge.data.FindingType
 import com.smartlease.edge.data.InspectionEntity
 import com.smartlease.edge.data.Severity
+import com.smartlease.edge.deduction.FindingDetail
 import com.smartlease.edge.ir.CommonAcIrProfiles
 import com.smartlease.edge.ir.IrController
 import com.smartlease.edge.ocr.OcrEngine
@@ -46,6 +49,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
+
+/** Pre-filled deposit figure -- the demo's own stated amount, not a claim about any real lease. */
+private const val DEFAULT_DEPOSIT_RUPEES = 90_000
+
+/** Long enough for any real Chennai deposit, short enough that a mis-tap cannot run off screen. */
+private const val MAX_DEPOSIT_DIGITS = 8
 
 /** A logged finding keeps its severity, so the list can show it rather than flatten to text. */
 private data class LoggedFinding(
@@ -91,6 +100,12 @@ fun WalkthroughScreen(onReportGenerated: (InspectionReport) -> Unit) {
     var lastSafetyVerdict by remember { mutableStateOf<SafetyGate.Verdict?>(null) }
     var busy by remember { mutableStateOf(false) }
 
+    // Nothing else in the app has a source for the deposit -- DeductionEngine needs a
+    // rupee figure to subtract findings from, and until now nothing ever supplied one.
+    // Kept as the raw digit string the field shows, not an Int, so a mid-edit empty field
+    // (backspacing to retype) doesn't have to round-trip through a placeholder value.
+    var depositInput by remember { mutableStateOf(DEFAULT_DEPOSIT_RUPEES.toString()) }
+
     LaunchedEffect(Unit) {
         val segmenter = withContext(Dispatchers.Default) { DefectSegmenterFactory.create(context) }
         // null when no trained model ships -- classify() then keeps the heuristic
@@ -120,7 +135,8 @@ fun WalkthroughScreen(onReportGenerated: (InspectionReport) -> Unit) {
         type: FindingType,
         label: String,
         value: String,
-        detail: String? = null,
+        detail: FindingDetail,
+        noteText: String? = null,
         lamp: Lamp = Lamp.PASS
     ) {
         val verdict = SafetyGate.evaluate(label)
@@ -133,7 +149,7 @@ fun WalkthroughScreen(onReportGenerated: (InspectionReport) -> Unit) {
             ?: if (type == FindingType.VISUAL_DEFECT) Severity.NOTABLE else Severity.INFO
         // A safety escalation always outranks the caller's own lamp.
         val effective = if (verdict.escalatedSeverity != null) Lamp.FLAG else lamp
-        findings = findings + LoggedFinding(effective, label, value, detail ?: verdict.reason)
+        findings = findings + LoggedFinding(effective, label, value, noteText ?: verdict.reason)
 
         try {
             db.inspectionDao().insert(
@@ -142,7 +158,12 @@ fun WalkthroughScreen(onReportGenerated: (InspectionReport) -> Unit) {
                     timestampEpochMillis = System.currentTimeMillis(),
                     findingType = type,
                     label = label,
-                    detailJson = "{}",
+                    // Used to be a hardcoded "{}" for every finding, which meant
+                    // DeductionEngine.summarise had nothing to price a single row against --
+                    // every session produced an empty balance sheet regardless of what was
+                    // actually found. This is the one line that makes the deposit arithmetic
+                    // possible at all.
+                    detailJson = detail.toJson(),
                     severity = severity
                 )
             )
@@ -318,8 +339,9 @@ fun WalkthroughScreen(onReportGenerated: (InspectionReport) -> Unit) {
                             }
                             if (text.isNotBlank()) {
                                 logFinding(
-                                    FindingType.OCR_TEXT_READ, "Text read", "OCR",
-                                    text.take(90)
+                                    type = FindingType.OCR_TEXT_READ, label = "Text read", value = "OCR",
+                                    detail = FindingDetail.Note(text.take(90)),
+                                    noteText = text.take(90)
                                 )
                             }
                             // 640x640 forward pass plus an 8400-anchor decode. On the main thread
@@ -337,7 +359,13 @@ fun WalkthroughScreen(onReportGenerated: (InspectionReport) -> Unit) {
                                     type = FindingType.VISUAL_DEFECT,
                                     label = d.label,
                                     value = "%.2f sq ft".format(d.areaSqFtEstimate),
-                                    detail = "%s, %.0f%% confidence".format(mode, d.confidence * 100f),
+                                    detail = FindingDetail.VisualDefect(
+                                        defectClass = d.label,
+                                        areaSqFt = d.areaSqFtEstimate,
+                                        confidence = d.confidence,
+                                        fromTrainedModel = segmenter.isTrainedModel
+                                    ),
+                                    noteText = "%s, %.0f%% confidence".format(mode, d.confidence * 100f),
                                     lamp = if (d.confidence >= 0.6f) Lamp.FLAG else Lamp.CAUTION
                                 )
                             }
@@ -378,9 +406,10 @@ fun WalkthroughScreen(onReportGenerated: (InspectionReport) -> Unit) {
                             val pose = if (s == null) "pose unavailable"
                             else "pitch %d, roll %d".format(s.pitchDeg.toInt(), s.rollDeg.toInt())
                             logFinding(
-                                FindingType.AR_BASELINE_ALIGNMENT,
-                                "Baseline pose recorded", "baseline",
-                                "$pose. Held in memory for this session only."
+                                type = FindingType.AR_BASELINE_ALIGNMENT,
+                                label = "Baseline pose recorded", value = "baseline",
+                                detail = FindingDetail.Note(pose),
+                                noteText = "$pose. Held in memory for this session only."
                             )
                         }
                     },
@@ -413,9 +442,37 @@ fun WalkthroughScreen(onReportGenerated: (InspectionReport) -> Unit) {
                                     AcousticTapClassifier.TapVerdict.LIKELY_SOLID -> "solid"
                                     AcousticTapClassifier.TapVerdict.INCONCLUSIVE -> "unclear"
                                 }
+                                // result.hollowProbability is the trained model's raw P(hollow)
+                                // when a trained classification produced this verdict, and null
+                                // whenever the heuristic decided instead -- no model shipped, or
+                                // TrainedTapClassifier declined to score a too-short/too-quiet
+                                // clip even with a model loaded. "Confidence" here means the
+                                // model's confidence in its OWN verdict, so a solid reading
+                                // reports 1 - P(hollow), not P(hollow) itself. Zero only when
+                                // there is genuinely no probability to report: INCONCLUSIVE, or
+                                // the heuristic path.
+                                val tapConfidence = when {
+                                    result.verdict == AcousticTapClassifier.TapVerdict.INCONCLUSIVE -> 0f
+                                    result.hollowProbability == null -> 0f
+                                    result.verdict == AcousticTapClassifier.TapVerdict.LIKELY_SOLID ->
+                                        1f - result.hollowProbability
+                                    else -> result.hollowProbability
+                                }
                                 logFinding(
-                                    FindingType.ACOUSTIC_TAP, "Tap test", reading,
-                                    result.confidenceNote, lamp
+                                    type = FindingType.ACOUSTIC_TAP, label = "Tap test", value = reading,
+                                    detail = FindingDetail.AcousticTap(
+                                        verdict = reading,
+                                        confidence = tapConfidence,
+                                        // Whether the trained model actually produced THIS
+                                        // verdict, not merely whether one was loaded -- a
+                                        // loaded model can still fall back to the heuristic
+                                        // per tap, and reporting the wrong source here is what
+                                        // would make DeductionEngine's basis text lie about
+                                        // where the number came from.
+                                        fromTrainedModel = result.hollowProbability != null
+                                    ),
+                                    noteText = result.confidenceNote,
+                                    lamp = lamp
                                 )
                             } catch (e: Exception) {
                                 // AudioRecord construction throws if the mic is held elsewhere.
@@ -445,16 +502,27 @@ fun WalkthroughScreen(onReportGenerated: (InspectionReport) -> Unit) {
                         val necHeaderBurst = intArrayOf(9000, 4500, 560, 560, 560, 1690)
                         when (val result =
                             irController.transmit(profile.typicalCarrierHz, necHeaderBurst)) {
+                            // "functional = true" here means only what the honesty comment
+                            // above says: the emitter fired. DeductionEngine's clearedNotes
+                            // wording is the one place that gets to say what that does and
+                            // does not confirm -- this call site adds no claim of its own.
                             is IrController.TransmitResult.Success -> logFinding(
-                                FindingType.IR_APPLIANCE_CHECK, "IR command transmitted", "IR sent",
-                                "%s, %d kHz — pattern not verified against this unit".format(
+                                type = FindingType.IR_APPLIANCE_CHECK, label = "IR command transmitted", value = "IR sent",
+                                detail = FindingDetail.ApplianceCheck(
+                                    appliance = "${profile.brand} AC", functional = true
+                                ),
+                                noteText = "%s, %d kHz — pattern not verified against this unit".format(
                                     profile.brand, profile.typicalCarrierHz / 1000
                                 ),
-                                Lamp.PASS
+                                lamp = Lamp.PASS
                             )
                             is IrController.TransmitResult.Failure -> logFinding(
-                                FindingType.IR_APPLIANCE_CHECK, "IR transmit failed", "no IR",
-                                result.reason, Lamp.CAUTION
+                                type = FindingType.IR_APPLIANCE_CHECK, label = "IR transmit failed", value = "no IR",
+                                detail = FindingDetail.ApplianceCheck(
+                                    appliance = "${profile.brand} AC", functional = false
+                                ),
+                                noteText = result.reason,
+                                lamp = Lamp.CAUTION
                             )
                         }
                     }
@@ -538,6 +606,27 @@ fun WalkthroughScreen(onReportGenerated: (InspectionReport) -> Unit) {
             }
         }
 
+        Column(Modifier.padding(horizontal = 16.dp)) {
+            OutlinedTextField(
+                value = depositInput,
+                onValueChange = { new ->
+                    // Reject anything that is not plain digits, and cap the length so a
+                    // mis-tap cannot produce a refund figure with more zeros than any real
+                    // Chennai deposit has. An empty field is allowed mid-edit; it is treated
+                    // as "no deposit entered" below, same as a session with none at all.
+                    if (new.isEmpty() || (new.length <= MAX_DEPOSIT_DIGITS && new.all(Char::isDigit))) {
+                        depositInput = new
+                    }
+                },
+                label = { Text("Deposit held (₹)") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        Spacer(Modifier.height(8.dp))
+
         Button(
             enabled = findings.isNotEmpty() && !busy,
             onClick = {
@@ -545,12 +634,16 @@ fun WalkthroughScreen(onReportGenerated: (InspectionReport) -> Unit) {
                     busy = true
                     try {
                         val stored = db.inspectionDao().findingsForSessionOnce(sessionId)
+                        // Null when the field was left empty -- ReportGenerator then leaves
+                        // the report's deductions unset rather than pricing against a figure
+                        // nobody entered.
+                        val depositRupees = depositInput.toIntOrNull()
                         // Digest, layout and file write, all off the UI thread. Built once
                         // here and handed upwards -- MainActivity used to re-query and
                         // rebuild it, producing a second report object for the same session.
                         val report = withContext(Dispatchers.Default) {
                             val r = ReportGenerator.buildReport(
-                                sessionId, "Demo Property, Chennai", stored
+                                sessionId, "Demo Property, Chennai", stored, depositRupees
                             )
                             ReportGenerator.renderToPdf(context, r)
                             r

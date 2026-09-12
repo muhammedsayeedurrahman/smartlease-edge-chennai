@@ -37,6 +37,9 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
+import com.smartlease.edge.deduction.DeductionEngine
+import com.smartlease.edge.deduction.DeductionLine
+import com.smartlease.edge.deduction.DeductionSummary
 import com.smartlease.edge.report.FindingsDigest
 import com.smartlease.edge.report.InspectionReport
 import com.smartlease.edge.report.QrCode
@@ -45,6 +48,7 @@ import com.smartlease.edge.ui.components.Lamp
 import com.smartlease.edge.ui.components.Panel
 import com.smartlease.edge.ui.components.StatusLamp
 import com.smartlease.edge.ui.theme.ReadoutValue
+import com.smartlease.edge.ui.theme.ReadoutValueLarge
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -203,6 +207,15 @@ fun ReportScreen(report: InspectionReport?, onBack: () -> Unit) {
             // Shown on screen as well as in the PDF footer so both parties can read the same
             // digest off the same phone and check it against the document afterwards.
             item {
+                // Above the digest panel, not below it: the balance sheet is what a landlord
+                // and tenant are actually here to look at, and the digest is how they check
+                // the record afterwards -- outcome before verification, same order as the
+                // verdict panel at the top of this screen.
+                report.deductions?.let { deductions ->
+                    Spacer(Modifier.height(6.dp))
+                    DepositBalanceSheet(deductions)
+                }
+
                 Spacer(Modifier.height(6.dp))
                 Panel(Modifier.fillMaxWidth()) {
                     Column {
@@ -281,6 +294,137 @@ fun ReportScreen(report: InspectionReport?, onBack: () -> Unit) {
             }
         }
     }
+}
+
+/**
+ * The deposit balance sheet, mirrored from the PDF's own rendering of it: what the deposit
+ * was, what each line cost and why, and the refund figure a landlord and tenant are actually
+ * here to look at. Nothing here that is not also on the printed page -- this panel and
+ * [ReportGenerator.renderToPdf]'s deduction section must always tell the same story.
+ */
+@Composable
+private fun DepositBalanceSheet(deductions: DeductionSummary) {
+    Panel(Modifier.fillMaxWidth()) {
+        Column {
+            Text(
+                "Deposit balance sheet",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(Modifier.height(10.dp))
+
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    "Deposit held",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    "₹%,d".format(deductions.depositRupees),
+                    style = ReadoutValue,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+
+            if (deductions.lines.isNotEmpty()) {
+                Spacer(Modifier.height(12.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                deductions.lines.forEach { line -> DeductionLineRow(line) }
+            }
+
+            Spacer(Modifier.height(14.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            Spacer(Modifier.height(10.dp))
+
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    "Total deductions",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    "₹%,d".format(deductions.totalDeductionRupees),
+                    style = ReadoutValue,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+
+            Spacer(Modifier.height(14.dp))
+
+            // The demo's punchline: what actually comes back. The largest, boldest readout
+            // on this screen, the same treatment the tilt number gets on the walkthrough
+            // screen for the thing a person is there to look at.
+            Text(
+                "Refund due",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                "₹%,d".format(deductions.refundRupees),
+                style = ReadoutValueLarge,
+                color = if (deductions.refundRupees < 0) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                }
+            )
+
+            if (deductions.clearedNotes.isNotEmpty()) {
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    "Not priced — for human review",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(6.dp))
+                deductions.clearedNotes.forEach { note ->
+                    Text(
+                        "•  $note",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(14.dp))
+            // Non-negotiable per the design doc: state exactly what this arithmetic does and
+            // does not cover, in the one place a reader is looking at the rupee figures.
+            Text(
+                "These repair rates are the team's own Chennai contractor estimates, not " +
+                    "published tariffs. Nothing below " +
+                    "${"%.0f".format(DeductionEngine.PRICING_CONFIDENCE_FLOOR * 100f)}% model " +
+                    "confidence, and nothing from the colour heuristic, is ever priced. The " +
+                    "deposit figure above was entered by the operator and is not covered by " +
+                    "the SHA-256 digest below.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun DeductionLineRow(line: DeductionLine) {
+    Spacer(Modifier.height(10.dp))
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(
+            line.description,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            "₹%,d".format(line.amountRupees),
+            style = ReadoutValue,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+    Text(
+        line.basis,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
 }
 
 @Composable

@@ -7,6 +7,9 @@ import android.graphics.pdf.PdfDocument
 import android.text.StaticLayout
 import android.text.TextPaint
 import com.smartlease.edge.data.InspectionEntity
+import com.smartlease.edge.deduction.DeductionEngine
+import com.smartlease.edge.deduction.DeductionLine
+import com.smartlease.edge.deduction.DeductionSummary
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
@@ -34,7 +37,17 @@ object ReportGenerator {
     private const val PAGE_HEIGHT = 842
     private const val MARGIN = 40
 
-    fun buildReport(sessionId: String, propertyLabel: String, findings: List<InspectionEntity>): InspectionReport {
+    /**
+     * @param depositRupees null for a session with no deposit to track (e.g. a maintenance
+     * walkthrough) -- the report is still produced, just with [InspectionReport.deductions]
+     * left null rather than a balance sheet built from a figure nobody entered.
+     */
+    fun buildReport(
+        sessionId: String,
+        propertyLabel: String,
+        findings: List<InspectionEntity>,
+        depositRupees: Int? = null
+    ): InspectionReport {
         val sections = findings.groupBy { it.findingType }.map { (type, items) ->
             ReportSection(
                 title = type.name.replace('_', ' '),
@@ -56,7 +69,8 @@ object ReportGenerator {
             sections = sections,
             overallVerdict = verdict,
             findingsSha256 = FindingsDigest.sha256Hex(sessionId, findings),
-            findingCount = findings.size
+            findingCount = findings.size,
+            deductions = depositRupees?.let { DeductionEngine.summarise(it, findings) }
         )
     }
 
@@ -117,6 +131,15 @@ object ReportGenerator {
             layout.draw(canvas)
             canvas.restore()
             y += layout.height + 16
+        }
+
+        // Deposit balance sheet, when a deposit was recorded for this session. Placed after
+        // the findings sections and before the verification block, same reading order as the
+        // report screen: what happened, then what it costs, then how to check the record.
+        if (report.deductions != null) {
+            val cursor = PdfCursor(document, page, canvas, pageNumber, y)
+            drawDeductionSummary(cursor, report, report.deductions)
+            page = cursor.page; canvas = cursor.canvas; pageNumber = cursor.pageNumber; y = cursor.y
         }
 
         // Verification block on the last page: the same digest as a scannable symbol.
@@ -212,5 +235,138 @@ object ReportGenerator {
             "Session ${report.sessionId}   ·   page $pageNumber",
             MARGIN.toFloat(), y, footPaint
         )
+    }
+
+    /**
+     * Cursor for the page-break loop the deduction summary below needs: which page and
+     * canvas are live, how far down the page drawing has reached, and the running page
+     * count. Threaded through instead of adding more vars to [renderToPdf] because this
+     * section breaks pages line-by-line, the same as the findings loop above it, and growing
+     * that function's own local state further would make it unreadable rather than just long.
+     */
+    private class PdfCursor(
+        val document: PdfDocument,
+        var page: PdfDocument.Page,
+        var canvas: Canvas,
+        var pageNumber: Int,
+        var y: Float
+    )
+
+    /** Same finish-page/start-page sequence used throughout this file, made reusable. */
+    private fun PdfCursor.breakPageIfBelow(report: InspectionReport, floor: Int) {
+        if (y <= PAGE_HEIGHT - floor) return
+        drawFooter(canvas, report, pageNumber)
+        document.finishPage(page)
+        pageNumber++
+        page = document.startPage(PdfDocument.PageInfo.Builder(PAGE_WIDTH, PAGE_HEIGHT, pageNumber).create())
+        canvas = page.canvas
+        y = MARGIN.toFloat()
+    }
+
+    /**
+     * The deposit balance sheet: what a landlord and tenant actually argue over. Every rupee
+     * figure traces back to a [DeductionLine.basis] on the same page, and the honesty note at
+     * the end says outright what this arithmetic does not cover -- an unreviewed figure with
+     * no caveat is the one a dispute exploits.
+     */
+    private fun drawDeductionSummary(cursor: PdfCursor, report: InspectionReport, deductions: DeductionSummary) {
+        val headerPaint = TextPaint().apply { textSize = 13f; isFakeBoldText = true }
+        val bodyPaint = TextPaint().apply { textSize = 10.5f }
+
+        cursor.breakPageIfBelow(report, 160)
+        cursor.canvas.drawText("Deposit balance sheet", MARGIN.toFloat(), cursor.y, headerPaint)
+        cursor.y += 20
+        cursor.canvas.drawText(
+            "Deposit held: ₹%,d".format(deductions.depositRupees), MARGIN.toFloat(), cursor.y, bodyPaint
+        )
+        cursor.y += 18
+
+        deductions.lines.forEach { drawDeductionLine(cursor, report, bodyPaint, it) }
+
+        cursor.breakPageIfBelow(report, 100)
+        cursor.canvas.drawText(
+            "Total deductions: ₹%,d".format(deductions.totalDeductionRupees), MARGIN.toFloat(), cursor.y, headerPaint
+        )
+        cursor.y += 18
+        cursor.canvas.drawText(
+            "Refund due: ₹%,d".format(deductions.refundRupees), MARGIN.toFloat(), cursor.y, headerPaint
+        )
+        cursor.y += 24
+
+        drawClearedNotes(cursor, report, headerPaint, bodyPaint, deductions.clearedNotes)
+        drawDeductionHonestyNote(cursor, report, bodyPaint)
+    }
+
+    /** One priced line: description and amount on one row, the basis wrapped beneath it. */
+    private fun drawDeductionLine(
+        cursor: PdfCursor, report: InspectionReport, bodyPaint: TextPaint, line: DeductionLine
+    ) {
+        cursor.breakPageIfBelow(report, 120)
+        val descriptionPaint = TextPaint().apply { textSize = bodyPaint.textSize; isFakeBoldText = true }
+        val amountPaint = TextPaint().apply {
+            textSize = bodyPaint.textSize; isFakeBoldText = true; textAlign = Paint.Align.RIGHT
+        }
+        cursor.canvas.drawText(line.description, MARGIN.toFloat(), cursor.y, descriptionPaint)
+        cursor.canvas.drawText(
+            "₹%,d".format(line.amountRupees), (PAGE_WIDTH - MARGIN).toFloat(), cursor.y, amountPaint
+        )
+        cursor.y += 15
+
+        val layout = StaticLayout.Builder
+            .obtain(line.basis, 0, line.basis.length, bodyPaint, PAGE_WIDTH - MARGIN * 2)
+            .build()
+        cursor.canvas.save()
+        cursor.canvas.translate(MARGIN.toFloat(), cursor.y)
+        layout.draw(cursor.canvas)
+        cursor.canvas.restore()
+        cursor.y += layout.height + 12
+    }
+
+    /** Findings that cost nothing but still belong on the page, under their own heading. */
+    private fun drawClearedNotes(
+        cursor: PdfCursor, report: InspectionReport, headerPaint: TextPaint, bodyPaint: TextPaint, notes: List<String>
+    ) {
+        if (notes.isEmpty()) return
+        cursor.breakPageIfBelow(report, 100)
+        cursor.canvas.drawText("Not priced — for human review", MARGIN.toFloat(), cursor.y, headerPaint)
+        cursor.y += 18
+        notes.forEach { note ->
+            cursor.breakPageIfBelow(report, 80)
+            val layout = StaticLayout.Builder
+                .obtain(note, 0, note.length, bodyPaint, PAGE_WIDTH - MARGIN * 2)
+                .build()
+            cursor.canvas.save()
+            cursor.canvas.translate(MARGIN.toFloat(), cursor.y)
+            layout.draw(cursor.canvas)
+            cursor.canvas.restore()
+            cursor.y += layout.height + 8
+        }
+        cursor.y += 8
+    }
+
+    /**
+     * Non-negotiable per the design doc: the rates are the team's own estimates rather than
+     * a published tariff, nothing under the confidence floor or from the colour heuristic is
+     * priced, and the deposit figure is operator-entered and sits outside the findings
+     * digest above -- a reader must not mistake this sheet for more certainty than it has.
+     */
+    private fun drawDeductionHonestyNote(cursor: PdfCursor, report: InspectionReport, bodyPaint: TextPaint) {
+        cursor.breakPageIfBelow(report, 220)
+        val notePaint = TextPaint().apply { textSize = 8.5f; color = 0xFF333333.toInt() }
+        val floorPercent = "%.0f".format(DeductionEngine.PRICING_CONFIDENCE_FLOOR * 100f)
+        val text = "These repair rates are the team's own Chennai contractor estimates, not " +
+            "published tariffs. Nothing below $floorPercent% model confidence, and nothing " +
+            "flagged by the colour heuristic instead of the trained model, is ever priced -- " +
+            "both are listed above for human review only. The deposit figure at the top of " +
+            "this sheet was entered by the operator at report time; unlike the findings " +
+            "above it, it is not covered by the SHA-256 digest on this page."
+        val layout = StaticLayout.Builder
+            .obtain(text, 0, text.length, notePaint, PAGE_WIDTH - MARGIN * 2)
+            .build()
+        cursor.canvas.save()
+        cursor.canvas.translate(MARGIN.toFloat(), cursor.y)
+        layout.draw(cursor.canvas)
+        cursor.canvas.restore()
+        cursor.y += layout.height + 16
     }
 }
