@@ -4,25 +4,21 @@ import android.Manifest
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.runtime.*
+import androidx.activity.viewModels
+import androidx.compose.runtime.Composable
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.smartlease.edge.data.SessionType
-import com.smartlease.edge.report.InspectionReport
-import com.smartlease.edge.ui.screens.CountersignScreen
-import com.smartlease.edge.ui.screens.HomeScreen
-import com.smartlease.edge.ui.screens.ReportScreen
-import com.smartlease.edge.ui.screens.SelfTestScreen
-import com.smartlease.edge.ui.screens.TapCaptureScreen
-import com.smartlease.edge.ui.screens.WalkthroughScreen
+import com.smartlease.edge.ui.AppViewModel
+import com.smartlease.edge.ui.screens.*
 import com.smartlease.edge.ui.theme.SmartLeaseEdgeTheme
 
 class MainActivity : ComponentActivity() {
+
+    private val appViewModel: AppViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -31,7 +27,6 @@ class MainActivity : ComponentActivity() {
             ActivityResultContracts.RequestMultiplePermissions()
         ) { /* handled by re-composition reading ContextCompat.checkSelfPermission */ }
 
-        // Only what the app uses. Location was requested here and never read.
         permissionLauncher.launch(
             arrayOf(
                 Manifest.permission.CAMERA,
@@ -41,77 +36,95 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             SmartLeaseEdgeTheme {
-                SmartLeaseApp()
+                SmartLeaseApp(appViewModel)
             }
         }
     }
 }
 
 @Composable
-fun SmartLeaseApp() {
+fun SmartLeaseApp(viewModel: AppViewModel) {
     val navController = rememberNavController()
-    var loadedReport by remember { mutableStateOf<InspectionReport?>(null) }
-    // Set by HomeScreen just before navigating, read once WalkthroughScreen composes. A nav
-    // route argument would round-trip this through String just to parse it straight back to
-    // an enum -- this is in-process navigation between two screens in the same Activity.
-    var pendingSessionType by remember { mutableStateOf(SessionType.MOVE_OUT) }
 
     NavHost(navController = navController, startDestination = "home") {
         composable("home") {
-            // No "past reports" entry: there is no session-list query, so the button only
-            // ever reached an empty report screen. A missing feature costs nothing; a broken
-            // one a judge taps costs trust.
             HomeScreen(
-                onStartWalkthrough = { sessionType ->
-                    pendingSessionType = sessionType
-                    navController.navigate("walkthrough")
+                viewModel = viewModel,
+                onCreateProperty = { isFlat -> 
+                    navController.navigate("create_property/$isFlat") 
                 },
-                onOpenSelfTest = { navController.navigate("selftest") },
-                // No report of its own on this device -- see CountersignScreen's own doc
-                // comment on why that must not be confused with whatever report was last
-                // viewed in this Activity.
-                onOpenCountersign = { navController.navigate("countersign_scan_only") },
-                onOpenTapCapture =
-                    if (BuildConfig.DEBUG) ({ navController.navigate("tapcapture") }) else null
-            )
-        }
-        if (BuildConfig.DEBUG) {
-            composable("tapcapture") {
-                TapCaptureScreen(onBack = { navController.popBackStack() })
-            }
-        }
-        // Ships in release on purpose: the judging handset is a loaner and there may be
-        // no cable, no laptop and no adb at the venue.
-        composable("selftest") {
-            SelfTestScreen(onBack = { navController.popBackStack() })
-        }
-        composable("walkthrough") {
-            WalkthroughScreen(
-                sessionType = pendingSessionType,
-                // The report is already built and rendered by the time this fires. Re-querying
-                // and rebuilding it here produced a second report object for the same session,
-                // with a different generatedAt, for no benefit.
-                onReportGenerated = { report ->
-                    loadedReport = report
-                    navController.navigate("report/${report.sessionId}")
+                onPropertySelected = { propertyId ->
+                    navController.navigate("property_dashboard/$propertyId")
                 }
             )
         }
         composable(
-            route = "report/{sessionId}",
-            arguments = listOf(navArgument("sessionId") { type = NavType.StringType })
-        ) {
-            ReportScreen(
-                report = loadedReport,
+            route = "create_property/{isFlat}",
+            arguments = listOf(navArgument("isFlat") { type = NavType.BoolType })
+        ) { backStackEntry ->
+            val isFlat = backStackEntry.arguments?.getBoolean("isFlat") ?: false
+            CreatePropertyScreen(
+                viewModel = viewModel,
+                isFlat = isFlat,
                 onBack = { navController.popBackStack() },
-                onCountersign = { navController.navigate("countersign") }
+                onPropertyCreated = { propertyId ->
+                    navController.popBackStack()
+                    navController.navigate("property_dashboard/$propertyId")
+                }
             )
         }
-        composable("countersign") {
-            CountersignScreen(report = loadedReport, onBack = { navController.popBackStack() })
+        composable(
+            route = "property_dashboard/{propertyId}",
+            arguments = listOf(navArgument("propertyId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val propertyId = backStackEntry.arguments?.getString("propertyId") ?: return@composable
+            PropertyDashboardScreen(
+                viewModel = viewModel,
+                propertyId = propertyId,
+                onBack = { navController.popBackStack("home", inclusive = false) },
+                onRoomSelected = { roomId ->
+                    navController.navigate("room_config/$roomId")
+                }
+            )
         }
-        composable("countersign_scan_only") {
-            CountersignScreen(report = null, onBack = { navController.popBackStack() })
+        composable(
+            route = "room_config/{roomId}",
+            arguments = listOf(navArgument("roomId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val roomId = backStackEntry.arguments?.getString("roomId") ?: return@composable
+            RoomConfigScreen(
+                viewModel = viewModel,
+                roomId = roomId,
+                onBack = { navController.popBackStack() },
+                onRecordSurface = { rid, surfaceType ->
+                    navController.navigate("video_capture/$rid/$surfaceType")
+                }
+            )
+        }
+        composable(
+            route = "video_capture/{roomId}/{surfaceType}",
+            arguments = listOf(
+                navArgument("roomId") { type = NavType.StringType },
+                navArgument("surfaceType") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val roomId = backStackEntry.arguments?.getString("roomId") ?: return@composable
+            val surfaceType = backStackEntry.arguments?.getString("surfaceType") ?: return@composable
+            
+            VideoCaptureScreen(
+                viewModel = viewModel,
+                roomId = roomId,
+                surfaceType = surfaceType,
+                onExit = { navController.popBackStack() },
+                onAddAnotherRoom = {
+                    val room = viewModel.rooms.find { it.id == roomId }
+                    if (room != null) {
+                        navController.popBackStack("property_dashboard/${room.propertyId}", inclusive = false)
+                    } else {
+                        navController.popBackStack("home", inclusive = false)
+                    }
+                }
+            )
         }
     }
 }
