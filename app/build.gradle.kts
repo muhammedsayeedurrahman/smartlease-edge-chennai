@@ -34,6 +34,10 @@ android {
                 ?: emptyList()
             abiFilters += extraAbis
         }
+
+        vectorDrawables {
+            useSupportLibrary = true
+        }
     }
 
     buildTypes {
@@ -61,6 +65,12 @@ android {
         // .ptl model files are already compressed archives; letting aapt re-compress them
         // breaks LiteModuleLoader's ability to mmap them straight out of the APK.
         noCompress += "ptl"
+    }
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
     }
 }
 

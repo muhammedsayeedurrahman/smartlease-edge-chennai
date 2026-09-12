@@ -17,16 +17,11 @@ class WallInspectionAnalyzer(
 ) : ImageAnalysis.Analyzer {
 
     private val capturedQuadrants = mutableSetOf<Quadrant>()
-    private var currentQuadrant = Quadrant.NORTH
 
     init {
         headingTracker.start()
     }
 
-    fun updateCurrentQuadrant(quadrant: Quadrant) {
-        this.currentQuadrant = quadrant
-    }
-    
     fun reset() {
         capturedQuadrants.clear()
     }
@@ -37,7 +32,7 @@ class WallInspectionAnalyzer(
 
     @androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
     override fun analyze(imageProxy: ImageProxy) {
-        val quadrant = currentQuadrant
+        val quadrant = headingTracker.currentQuadrant
 
         // 1. Skip if wall quadrant already captured
         if (capturedQuadrants.contains(quadrant)) {

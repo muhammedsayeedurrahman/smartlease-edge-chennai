@@ -41,6 +41,8 @@ import com.smartlease.edge.ui.theme.ReadoutValue
 import com.smartlease.edge.ui.theme.ReadoutValueLarge
 import com.smartlease.edge.vision.DefectSegmenterFactory
 import com.smartlease.edge.inspection360.*
+import com.smartlease.edge.llm.LLMEngine
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.util.UUID
 
@@ -76,6 +78,10 @@ fun WalkthroughScreen(onReportGenerated: (String) -> Unit) {
     var lastSafetyVerdict by remember { mutableStateOf<SafetyGate.Verdict?>(null) }
     var busy by remember { mutableStateOf(false) }
 
+    // LLM State
+    var llmReport by remember { mutableStateOf("") }
+    var isGeneratingLlmReport by remember { mutableStateOf(false) }
+
     // 360 Auto-Capture State
     var isAutoCaptureMode by remember { mutableStateOf(false) }
     var isMovingTooFast by remember { mutableStateOf(false) }
@@ -85,7 +91,7 @@ fun WalkthroughScreen(onReportGenerated: (String) -> Unit) {
 
     // 360 Coordinator & Analyzer
     val roomCoordinator = remember {
-        RoomInspectionCoordinator(visionSegmenter) { records ->
+        RoomInspectionCoordinator(context, visionSegmenter) { records ->
             isAutoCaptureMode = false
             records.forEach { record ->
                 val severity = if (record.defectClass == "CLEAR") Lamp.PASS else if (record.confidence >= 0.6f) Lamp.FLAG else Lamp.CAUTION
@@ -100,7 +106,7 @@ fun WalkthroughScreen(onReportGenerated: (String) -> Unit) {
     }
     
     val wallAnalyzer = remember {
-        val tracker = HeadingTracker(context) { _, _ -> } // Quadrant tracking handled internally
+        val tracker = HeadingTracker(context)
         WallInspectionAnalyzer(
             headingTracker = tracker,
             onWallCaptured = { quad, bmp, z ->
@@ -114,6 +120,11 @@ fun WalkthroughScreen(onReportGenerated: (String) -> Unit) {
 
     DisposableEffect(Unit) {
         arTracker.start { alignmentState = it }
+        scope.launch {
+            if (!LLMEngine.isInitialized) {
+                LLMEngine.initialize(context)
+            }
+        }
         onDispose { 
             arTracker.stop()
             wallAnalyzer.stop()
@@ -340,7 +351,10 @@ fun WalkthroughScreen(onReportGenerated: (String) -> Unit) {
                 Button(
                     onClick = {
                         isAutoCaptureMode = !isAutoCaptureMode
-                        if (isAutoCaptureMode) wallAnalyzer.reset()
+                        if (isAutoCaptureMode) {
+                            wallAnalyzer.reset()
+                            roomCoordinator.reset()
+                        }
                     },
                     modifier = Modifier.weight(1f).height(52.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = if (isAutoCaptureMode) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
@@ -494,32 +508,84 @@ fun WalkthroughScreen(onReportGenerated: (String) -> Unit) {
             }
         }
 
-        Button(
-            enabled = findings.isNotEmpty() && !busy,
-            onClick = {
-                scope.launch {
-                    busy = true
-                    try {
-                        val stored = db.inspectionDao().findingsForSessionOnce(sessionId)
-                        val report = ReportGenerator.buildReport(
-                            sessionId, "Demo Property, Chennai", stored
-                        )
-                        ReportGenerator.renderToPdf(context, report)
-                        onReportGenerated(sessionId)
-                    } finally {
-                        busy = false
-                    }
-                }
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-                .height(52.dp)
-        ) {
+        if (llmReport.isNotBlank() || isGeneratingLlmReport) {
             Text(
-                if (findings.isEmpty()) "Capture a finding first" else "Save report",
-                style = MaterialTheme.typography.titleMedium
+                text = "AI Summary",
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                color = MaterialTheme.colorScheme.primary
             )
+            Text(
+                text = if (llmReport.isBlank()) "Generating..." else llmReport,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .padding(12.dp)
+            )
+            Spacer(Modifier.height(12.dp))
+        }
+
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedButton(
+                enabled = findings.isNotEmpty() && !isGeneratingLlmReport,
+                onClick = {
+                    scope.launch {
+                        isGeneratingLlmReport = true
+                        llmReport = ""
+                        
+                        // Construct prompt from findings
+                        val prompt = buildString {
+                            append("Write a brief, professional move-out inspection summary based on these findings:\n")
+                            findings.forEach {
+                                append("- ${it.label}: ${it.value} (${it.detail ?: ""})\n")
+                            }
+                            append("\nHighlight any safety concerns or damage. Do not include a greeting or signature.")
+                        }
+
+                        LLMEngine.generateReportStream(prompt).collectLatest { token ->
+                            llmReport += token
+                        }
+                        isGeneratingLlmReport = false
+                    }
+                },
+                modifier = Modifier.weight(1f).height(52.dp)
+            ) {
+                Text(
+                    "AI Summary",
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+
+            Button(
+                enabled = findings.isNotEmpty() && !busy,
+                onClick = {
+                    scope.launch {
+                        busy = true
+                        try {
+                            val stored = db.inspectionDao().findingsForSessionOnce(sessionId)
+                            val report = ReportGenerator.buildReport(
+                                sessionId, "Demo Property, Chennai", stored
+                            )
+                            ReportGenerator.renderToPdf(context, report)
+                            onReportGenerated(sessionId)
+                        } finally {
+                            busy = false
+                        }
+                    }
+                },
+                modifier = Modifier.weight(1f).height(52.dp)
+            ) {
+                Text(
+                    if (findings.isEmpty()) "Empty" else "Save PDF",
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
         }
     }
 }

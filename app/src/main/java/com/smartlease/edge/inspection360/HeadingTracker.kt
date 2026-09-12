@@ -11,13 +11,16 @@ enum class Quadrant { NORTH, EAST, SOUTH, WEST }
 
 class HeadingTracker(
     context: Context, 
-    private val onQuadrantChange: (Quadrant, Float) -> Unit
+    private val onQuadrantChange: ((Quadrant, Float) -> Unit)? = null
 ) : SensorEventListener {
     private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
     private val rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
     private val gyroSensor = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
 
     var currentAngularVelocity = 0.0f
+        private set
+        
+    var currentQuadrant = Quadrant.NORTH
         private set
 
     fun start() {
@@ -53,7 +56,8 @@ class HeadingTracker(
                 in 135.0..225.0 -> Quadrant.SOUTH
                 else -> Quadrant.WEST
             }
-            onQuadrantChange(quadrant, azimuth)
+            this.currentQuadrant = quadrant
+            onQuadrantChange?.invoke(quadrant, azimuth)
         }
     }
 

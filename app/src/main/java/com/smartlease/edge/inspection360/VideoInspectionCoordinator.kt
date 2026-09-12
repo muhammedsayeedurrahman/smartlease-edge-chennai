@@ -12,8 +12,6 @@ class VideoInspectionCoordinator(
 ) {
 
     /**
-    /**
-    /**
      * Processes a recorded 360-degree video, extracts 4 frames (representing 4 walls),
      * runs defect segmentation on each frame, and returns a combined list of defects.
      *

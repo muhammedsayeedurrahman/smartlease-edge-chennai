@@ -1,17 +1,28 @@
 package com.smartlease.edge.inspection360
 
+import android.content.Context
 import android.graphics.Bitmap
+import android.os.Environment
 import com.smartlease.edge.vision.DefectSegmenter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
 
 class RoomInspectionCoordinator(
+    private val context: Context,
     private val defectSegmenter: DefectSegmenter,
     private val onInspectionFinished: (List<RoomDefectRecord>) -> Unit
 ) {
     private val capturedRecords = mutableListOf<RoomDefectRecord>()
+
+    fun reset() {
+        synchronized(capturedRecords) {
+            capturedRecords.clear()
+        }
+    }
 
     fun onWallKeyframeAcquired(quadrant: Quadrant, bitmap: Bitmap, zDistance: Float) {
         // Run inference in background coroutine pool
@@ -53,6 +64,20 @@ class RoomInspectionCoordinator(
                 }
             }
             
+            // Save the captured image to disk so the user can view it in the file explorer
+            try {
+                val picsDir = context.getExternalFilesDir(Environment.DIRECTORY_PICTURES)
+                if (picsDir != null) {
+                    val file = File(picsDir, "Inspection360_${quadrant.name}.jpg")
+                    val fos = FileOutputStream(file)
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 90, fos)
+                    fos.flush()
+                    fos.close()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+
             // Free memory
             bitmap.recycle()
 
