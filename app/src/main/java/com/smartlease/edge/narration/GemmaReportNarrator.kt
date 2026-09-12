@@ -2,7 +2,12 @@ package com.smartlease.edge.narration
 
 import android.content.Context
 import android.util.Log
-import com.google.mediapipe.tasks.genai.llminference.LlmInference
+import com.google.ai.edge.litertlm.Backend
+import com.google.ai.edge.litertlm.ConversationConfig
+import com.google.ai.edge.litertlm.Contents
+import com.google.ai.edge.litertlm.Engine
+import com.google.ai.edge.litertlm.EngineConfig
+import com.google.ai.edge.litertlm.SamplerConfig
 import com.smartlease.edge.data.InspectionEntity
 import com.smartlease.edge.deduction.FindingDetail
 import kotlinx.coroutines.Dispatchers
@@ -10,7 +15,13 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
- * Writes a report section with an on-device Gemma model via MediaPipe's LLM Inference task.
+ * Writes a report section with an on-device Gemma model via Google's LiteRT-LM runtime.
+ *
+ * This replaces the earlier MediaPipe `tasks-genai` path. MediaPipe reads the `.task`
+ * container only; Gemma 4 (and the Gemma 3n builds) ship as `.litertlm`, which MediaPipe
+ * rejects at tokenizer-init with a SentencePiece parse error. LiteRT-LM
+ * (`com.google.ai.edge.litertlm`) is Google's official runtime for the `.litertlm` container
+ * and loads those weights directly, with a CPU/GPU/NPU backend choice.
  *
  * Everything here is local: the weights are a file on this phone, inference runs on this
  * phone's CPU/GPU, and no text is sent anywhere. That matters beyond privacy theatre -- an
@@ -29,10 +40,10 @@ import java.io.File
  *  3. **Its output is audited, not trusted.** See [NarrationAudit].
  *
  * Construct through [ReportNarratorFactory], which handles the "no model on this device" case
- * without ever loading the MediaPipe classes.
+ * without ever loading the LiteRT-LM classes.
  */
 class GemmaReportNarrator private constructor(
-    private val engine: LlmInference,
+    private val engine: Engine,
     private val modelName: String
 ) : ReportNarrator {
 
@@ -43,7 +54,13 @@ class GemmaReportNarrator private constructor(
         val fallback = TemplateReportNarrator.compose(findings)
 
         val raw = withContext(Dispatchers.Default) {
-            runCatching { engine.generateResponse(prompt(sectionTitle, findings)) }
+            runCatching {
+                // A fresh conversation per section keeps each paragraph independent -- there
+                // is no chat history to carry, and a stale KV cache would only pin memory.
+                engine.createConversation(conversationConfig()).use { conversation ->
+                    conversation.sendMessage(prompt(sectionTitle, findings)).toString()
+                }
+            }
                 .onFailure { Log.w(TAG, "Gemma generation failed; using template", it) }
                 .getOrNull()
         } ?: return Narration(fallback, NarrationSource.TEMPLATE, "generation failed ($modelName)")
@@ -57,6 +74,28 @@ class GemmaReportNarrator private constructor(
             }
         }
     }
+
+    /**
+     * Greedy decoding: two runs over the same findings should produce the same paragraph. A
+     * report that reworded itself on every regeneration would make the findings digest look
+     * like the only stable thing on the page, and would make "we regenerated it and it says
+     * something else" a real conversation to have in front of a judge. `topK = 1` picks the
+     * single most likely token every step, which is the LiteRT-LM equivalent of the old
+     * MediaPipe `setMaxTopK(1)`.
+     */
+    private fun conversationConfig(): ConversationConfig =
+        ConversationConfig(
+            // topK = 1 alone is greedy, but LiteRT-LM has no defaults on this type, so the
+            // remaining knobs are set to values that cannot reintroduce randomness: a zero
+            // temperature and a fixed seed. topP is inert once topK is 1.
+            samplerConfig = SamplerConfig(
+                topK = 1,
+                topP = 1.0,
+                temperature = 0.0,
+                seed = 0
+            ),
+            maxOutputToken = MAX_TOKENS
+        )
 
     /**
      * The findings, rendered as a list, with instructions that close off the ways a summary of
@@ -111,20 +150,40 @@ class GemmaReportNarrator private constructor(
          * Loads the model at [file]. Returns null and logs rather than throwing -- a phone
          * that cannot run the model must still produce reports, so failure here is an expected
          * state, not an error condition.
+         *
+         * Backend choice is GPU-first with a CPU fallback: the demo handset (iQOO 15, SM8850)
+         * has an OpenCL driver and the GPU backend is markedly faster, but a device without one
+         * would fail GPU init, and we would rather narrate slowly on CPU than fall back to the
+         * template. Both are tried before giving up. NPU is not attempted here -- it needs a
+         * per-SoC library bundle the app does not ship.
          */
-        fun tryCreate(context: Context, file: File): GemmaReportNarrator? = runCatching {
-            val options = LlmInference.LlmInferenceOptions.builder()
-                .setModelPath(file.absolutePath)
-                .setMaxTokens(MAX_TOKENS)
-                // Greedy decoding: two runs over the same findings should produce the same
-                // paragraph. A report that reworded itself on every regeneration would make
-                // the findings digest look like the only stable thing on the page, and would
-                // make "we regenerated it and it says something else" a real conversation.
-                .setMaxTopK(1)
-                .build()
-            GemmaReportNarrator(LlmInference.createFromOptions(context, options), file.name)
-        }.onFailure {
-            Log.w(TAG, "Could not load Gemma model at ${file.absolutePath}", it)
-        }.getOrNull()
+        fun tryCreate(context: Context, file: File): GemmaReportNarrator? {
+            // Named pairs rather than `backend::class.simpleName`: reading the class name
+            // reflectively pulls in kotlin-reflect at runtime, and the version LiteRT-LM drags
+            // in is incompatible with the project's Kotlin, so touching Reflection here crashed
+            // with NoClassDefFoundError before the model ever loaded. A plain label avoids it.
+            val backends = listOf("GPU" to Backend.GPU(), "CPU" to Backend.CPU())
+            for ((name, backend) in backends) {
+                val engine = runCatching {
+                    val config = EngineConfig(
+                        modelPath = file.absolutePath,
+                        backend = backend,
+                        // A writable cache dir lets LiteRT-LM persist a compiled model, which
+                        // cuts the second load noticeably. App-private, cleared with the app.
+                        cacheDir = context.cacheDir.path
+                    )
+                    Engine(config).also { it.initialize() }
+                }.onFailure {
+                    Log.w(TAG, "LiteRT-LM $name init failed for ${file.name}", it)
+                }.getOrNull()
+
+                if (engine != null) {
+                    Log.i(TAG, "Loaded ${file.name} on $name")
+                    return GemmaReportNarrator(engine, file.name)
+                }
+            }
+            Log.w(TAG, "Could not load Gemma model at ${file.absolutePath} on any backend")
+            return null
+        }
     }
 }

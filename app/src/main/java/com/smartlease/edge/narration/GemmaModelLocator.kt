@@ -29,11 +29,11 @@ object GemmaModelLocator {
     const val DIRECTORY = "llm"
 
     /**
-     * Extensions MediaPipe's LlmInference accepts. `.litertlm` is the newer LiteRT-LM
-     * container; it is listed after `.task` because the MediaPipe runtime pinned here reads
-     * `.task` on every device, while `.litertlm` support depends on the build.
+     * Model container extensions the app can load. `.litertlm` is the LiteRT-LM container that
+     * [GemmaReportNarrator] now loads (Gemma 4 / Gemma 3n); `.task` is the older MediaPipe
+     * container. Both are accepted so a device set up with either build is found.
      */
-    private val EXTENSIONS = listOf(".task", ".litertlm", ".bin")
+    private val EXTENSIONS = listOf(".litertlm", ".task", ".bin")
 
     sealed interface Location {
         data class Found(val file: File) : Location

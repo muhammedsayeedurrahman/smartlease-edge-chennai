@@ -70,6 +70,13 @@
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules">
 
+        <!-- LiteRT-LM GPU backend (used by GemmaReportNarrator to run Gemma 4 .litertlm on the
+             device GPU). Both are required=false so the app still installs and runs on devices
+             without an OpenCL driver, in which case the narrator falls back to the CPU backend
+             and, failing that, to rule-based templating. -->
+        <uses-native-library android:name="libvndksupport.so" android:required="false" />
+        <uses-native-library android:name="libOpenCL.so" android:required="false" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
