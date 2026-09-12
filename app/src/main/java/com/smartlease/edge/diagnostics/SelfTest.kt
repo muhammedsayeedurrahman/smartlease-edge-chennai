@@ -6,8 +6,10 @@ import android.graphics.Bitmap
 import android.hardware.ConsumerIrManager
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
+import android.os.BatteryManager
 import android.os.Build
 import android.os.Debug
+import android.os.PowerManager
 import com.smartlease.edge.acoustic.AcousticModelBundle
 import com.smartlease.edge.acoustic.AcousticFeatureExtractor
 import com.smartlease.edge.vision.DefectSegmenterFactory
@@ -41,13 +43,79 @@ object SelfTest {
     data class Section(val title: String, val rows: List<Pair<String, String>>)
 
     /** Runs everything. Slow — do this off the main thread. */
-    fun run(context: Context): List<Section> = listOf(
-        device(context),
-        infrared(context),
-        cameras(context),
-        models(context),
-        privacy(context)
+    fun run(context: Context): List<Section> {
+        val thermalBefore = thermalStatus(context)
+        val modelsSection = models(context)
+        val thermalAfter = thermalStatus(context)
+        return listOf(
+            device(context),
+            infrared(context),
+            cameras(context),
+            modelsSection,
+            performance(context, thermalBefore, thermalAfter),
+            privacy(context)
+        )
+    }
+
+    // ------------------------------------------------------------ performance
+
+    /**
+     * Battery and thermal readings from Android's own public APIs — no synthetic load, no
+     * fabricated numbers. This is deliberately NOT a sustained stress test: it reads state
+     * before and after the ten timed inference runs [models] already does, which is a real
+     * but small and short workload. It answers "did ten inferences move the needle at all",
+     * not "what happens after twenty minutes" — that longer protocol is manual, on-device,
+     * and described in `docs/HACKTRACKER_STRATEGY.md` §5.3 (tests S1-S6). Treat every value
+     * here as a single data point, not a benchmark result to quote on its own.
+     */
+    private fun performance(context: Context, thermalBefore: String, thermalAfter: String) = Section(
+        "PERFORMANCE",
+        listOf(
+            "battery" to batteryPercent(context),
+            "thermal status (idle, before self-test)" to thermalBefore,
+            "thermal status (after vision warm-up loop)" to thermalAfter,
+            "what this does and doesn't show" to
+                "This reflects the load from this self-test's own $TIMED_RUNS-run inference " +
+                "loop, not sustained real-world use. A stable reading here is not evidence " +
+                "the device won't throttle during a real 10-20 minute walkthrough — only a " +
+                "longer, manual run can show that. See docs/HACKTRACKER_STRATEGY.md §5.3."
+        )
     )
+
+    private fun batteryPercent(context: Context): String = try {
+        val bm = context.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
+        val level = bm?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: -1
+        if (level in 0..100) "$level%" else UNAVAILABLE
+    } catch (e: Exception) {
+        "$UNAVAILABLE (${e.javaClass.simpleName})"
+    }
+
+    /**
+     * [PowerManager.getCurrentThermalStatus] needs API 29. Below that, Android exposes no
+     * public thermal signal at all — say so rather than guessing from CPU frequency, which
+     * would be a proxy, not a measurement.
+     */
+    private fun thermalStatus(context: Context): String {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            return "$UNAVAILABLE (needs API 29, this is API ${Build.VERSION.SDK_INT})"
+        }
+        return try {
+            val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+            when (pm?.currentThermalStatus) {
+                PowerManager.THERMAL_STATUS_NONE -> "NONE - no throttling"
+                PowerManager.THERMAL_STATUS_LIGHT -> "LIGHT"
+                PowerManager.THERMAL_STATUS_MODERATE -> "MODERATE"
+                PowerManager.THERMAL_STATUS_SEVERE -> "SEVERE - throttling likely"
+                PowerManager.THERMAL_STATUS_CRITICAL -> "CRITICAL"
+                PowerManager.THERMAL_STATUS_EMERGENCY -> "EMERGENCY"
+                PowerManager.THERMAL_STATUS_SHUTDOWN -> "SHUTDOWN imminent"
+                null -> UNAVAILABLE
+                else -> "unrecognised status code ${pm.currentThermalStatus}"
+            }
+        } catch (e: Exception) {
+            "$UNAVAILABLE (${e.javaClass.simpleName})"
+        }
+    }
 
     // ---------------------------------------------------------------- device
 
