@@ -10,6 +10,7 @@ import android.text.TextPaint
 import com.smartlease.edge.BuildConfig
 import com.smartlease.edge.data.CountersignatureEntity
 import com.smartlease.edge.data.InspectionEntity
+import com.smartlease.edge.data.SessionType
 import com.smartlease.edge.deduction.DeductionEngine
 import com.smartlease.edge.deduction.DeductionLine
 import com.smartlease.edge.deduction.DeductionSummary
@@ -47,13 +48,17 @@ object ReportGenerator {
      * @param baselineKeys findings already on record from this property's move-in session --
      * see [com.smartlease.edge.deduction.DeductionEngine.summarise]. Empty for a move-in
      * session itself, or a move-out with no baseline found.
+     * @param sessionType which kind of walkthrough this is -- carried onto
+     * [InspectionReport.sessionType] so a later sync upload reports the real session type
+     * instead of a guess.
      */
     fun buildReport(
         sessionId: String,
         propertyLabel: String,
         findings: List<InspectionEntity>,
         depositRupees: Int? = null,
-        baselineKeys: Set<String> = emptySet()
+        baselineKeys: Set<String> = emptySet(),
+        sessionType: SessionType = SessionType.MOVE_OUT
     ): InspectionReport {
         val sections = findings.groupBy { it.findingType }.map { (type, items) ->
             ReportSection(
@@ -79,7 +84,8 @@ object ReportGenerator {
             findingCount = findings.size,
             deductions = depositRupees?.let { DeductionEngine.summarise(it, findings, baselineKeys) },
             earliestFindingEpochMillis = findings.minOfOrNull { it.timestampEpochMillis },
-            latestFindingEpochMillis = findings.maxOfOrNull { it.timestampEpochMillis }
+            latestFindingEpochMillis = findings.maxOfOrNull { it.timestampEpochMillis },
+            sessionType = sessionType
         )
     }
 
@@ -121,7 +127,15 @@ object ReportGenerator {
             .format(Date(report.generatedAtEpochMillis))
         canvas.drawText("Property: ${report.propertyLabel}", MARGIN.toFloat(), y, metaPaint); y += 14
         canvas.drawText("Session: ${report.sessionId}   Generated: $dateStr", MARGIN.toFloat(), y, metaPaint); y += 14
-        canvas.drawText("Generated fully offline, on-device — no data left this phone.", MARGIN.toFloat(), y, metaPaint); y += 24
+        // This line is printed on a tenant-facing document, so it states only what stays true
+        // under every build configuration. It used to read "Generated fully offline, on-device
+        // — no data left this phone."; that became false the moment com.smartlease.edge.sync
+        // could upload a findings digest, and a sentence on the evidence artefact itself is the
+        // last place a stale claim should survive. What IS structurally guaranteed is the part
+        // that matters to a tenant: the inspection media never goes anywhere. The sync wire
+        // types carry no bitmap or byte-array field, and the server schema has no binary column,
+        // so media cannot be uploaded even by mistake. Only a digest and small metadata can be.
+        canvas.drawText("Captured and analysed on-device. Photos, video and audio never leave this phone.", MARGIN.toFloat(), y, metaPaint); y += 24
 
         canvas.drawText("Verdict: ${report.overallVerdict}", MARGIN.toFloat(), y, headerPaint); y += 26
 

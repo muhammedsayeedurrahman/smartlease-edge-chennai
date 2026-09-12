@@ -1,6 +1,6 @@
 # SmartLease Edge
 
-**Offline property verification for rental move-outs using on-device AI**
+**On-device property verification for rental move-outs — the inspection runs with no network, and photos never leave the phone**
 
 iQOO Hackathon 2026 · Smart Living Track · Chennai City Battle · Sep 12–13, 2026
 
@@ -19,7 +19,9 @@ Three-person team with previous hackathon experience:
 
 Security deposit disputes are the primary source of landlord-tenant conflict in India, consistently traced to lack of move-in documentation. In Bengaluru, deposits typically run 6–9 months' rent, making documentation failures expensive.
 
-SmartLeaseEdge provides timestamped, sensor-backed property verification that operates entirely offline. No cloud dependency means it works in basements, areas with poor connectivity, and doesn't require uploading tenant property data to external servers.
+SmartLeaseEdge provides timestamped, sensor-backed property verification. The entire inspection — capture, the vision model, the acoustic tap test, costing, the PDF and its SHA-256 — runs on the handset with no network, so it works in basements and dead spots.
+
+An optional, **off-by-default** sync (`com.smartlease.edge.sync`, server in `server/`) uploads a signed findings digest plus rupee totals so a report can be held in custody and countersigned. Inspection photos, video and audio are never uploaded, and this is structural rather than a promise: the sync wire types carry no bitmap or byte-array field, the server schema has no binary column, and the API rejects unknown fields outright.
 
 ---
 
@@ -29,19 +31,19 @@ Researched existing solutions with verified pricing:
 
 | Feature | SmartLeaseEdge | NoBroker | TurboTenant | zInspector | RentCheck |
 |---------|---------------|----------|-------------|------------|-----------|
-| Offline operation | Yes | No (human inspector) | No (cloud) | No (SaaS) | No (SaaS) |
+| Offline operation | Yes (inspection needs no network) | No (human inspector) | No (cloud) | No (SaaS) | No (SaaS) |
 | Functional testing | IR + acoustic | Visual only | Manual | Visual only | Visual only |
 | AI detection | On-device CPU | Human | None | Cloud AI | Cloud AI |
 | Pricing | ₹299–499 one-time | ₹1,649–5,999/inspection | Free (manual) | $0–115/mo | $0.60–1.10/unit/mo |
 | Target user | Single lease | Portfolios | DIY | Property managers | Property managers |
 
-**Key differentiation:** No existing solution combines offline operation with functional diagnostic testing. 
+**Key differentiation:** No existing solution combines a network-independent inspection with functional diagnostic testing. 
 
 - NoBroker: Requires scheduling human inspector, several days lead time, ₹1,649–5,999 per inspection
 - zInspector/RentCheck: Cloud-dependent SaaS, per-unit pricing model unsuitable for single-lease use case
 - TurboTenant: Manual documentation only, no automated defect detection
 
-SmartLeaseEdge targets the gap: offline-capable, tests appliance function (not just visual appearance), priced for single tenant-landlord transactions.
+SmartLeaseEdge targets the gap: the inspection is network-independent, it tests appliance function (not just visual appearance), and it is priced for single tenant-landlord transactions.
 
 ---
 
@@ -75,7 +77,7 @@ SmartLeaseEdge targets the gap: offline-capable, tests appliance function (not j
 └─────────────────────────────────────────────────────────────┘
                            ↓
 ┌─────────────────────────────────────────────────────────────┐
-│  OUTPUT: Timestamped local PDF + SHA-256 — 100% offline     │
+│  OUTPUT: Timestamped local PDF + SHA-256 — all on-device    │
 └─────────────────────────────────────────────────────────────┘
 ```
 

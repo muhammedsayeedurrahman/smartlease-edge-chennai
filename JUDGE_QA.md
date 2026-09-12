@@ -200,12 +200,33 @@ own phone in two seconds without you sending them anything.
 
 **Reframe:** "It's rule-based templating. Slide 12 lists it under NEXT, not under what shipped — we moved that tick tonight. What's real is that the report pipeline runs end to end today, and swapping the body of that one function is the entire integration."
 
-### Q17. `[CHANGED — now a clean yes]` "Your app says data never leaves the phone. Is that true?"
-**Fixed tonight (`ce9989f`).** `allowBackup="false"`, and both `backup_rules.xml` and
-`data_extraction_rules.xml` exclude every domain explicitly — an empty `<cloud-backup>`
-element would have been a no-op, which is the trap in that fix.
+### Q17. `[CHANGED AGAIN — the clean yes is gone, and the honest answer is narrower]` "Your app says data never leaves the phone. Is that true?"
+**Changed by the backend sync feature (2026-09-12).** The app now declares `INTERNET` and
+`ACCESS_NETWORK_STATE` for real, because the product owner decided it should sync signed
+reports to a backend (`com.smartlease.edge.sync`, server in `server/`). Sync is **off by
+default**, but the permission is genuinely there and a judge can see it.
 
-> "Yes, and it's checkable three ways: no INTERNET permission in the manifest, allowBackup is false, and every backup domain is excluded so the report PDF isn't eligible for cloud backup either. The only way anything leaves is the share sheet, which the user drives, one file at a time."
+> "Not as a blanket statement, so let me give you the precise version. The inspection never touches the network — capture, the vision model, the tap test, the costing, the PDF and its SHA-256 all run on the handset, and it works in a basement. Photos, video and audio never leave the phone at all, and that one is structural rather than a promise: the sync wire types have no field that can hold image bytes, the server schema has no binary column, and the API rejects unknown fields outright, so media cannot be uploaded even by accident. What can leave — only if you switch sync on — is a 64-character digest plus the rupee totals, so both sides can hold the same tamper-evident record. `allowBackup` is false and every backup domain is excluded, so nothing reaches Google Drive either."
+
+**If asked to prove it, the demo changed.** It used to be "look, no INTERNET permission in
+`dumpsys package`" — that proof is retired and must not be used. The replacement is to show
+`ReportUploadRequest.kt` (no media field exists on the wire type) and `server/app/storage/db.py`
+(no binary column), then POST a payload with an extra `photoBase64` field and let the server
+reject it with `422 Extra inputs are not permitted`. That demonstrates a property of the
+system rather than an absence you have to take on trust.
+
+**Superseded (do not use) — the previous "clean yes":** *"Yes, and it's checkable three ways: no
+INTERNET permission in the manifest, allowBackup is false, and every backup domain is
+excluded..."* The first of those three is no longer true. Before the sync feature it was
+verified twice on 2026-09-12 (zero `INTERNET` entries in the merged manifest; `dumpsys package`
+on the installed build listed only `TRANSMIT_IR`, `CAMERA`, `RECORD_AUDIO` and an internal
+broadcast permission), so it was a fair claim at the time — it simply stopped being one.
+
+**The PDF wording changed with it.** Page one used to print *"Generated fully offline,
+on-device — no data left this phone."* It now prints *"Captured and analysed on-device. Photos,
+video and audio never leave this phone."* — true under every build configuration. A stale claim
+printed on the tenant-facing evidence artefact is the last place one should be allowed to
+survive.
 
 **Superseded (do not use):** No. `AndroidManifest.xml:23` sets `allowBackup="true"` and the backup rules exclude only `smartlease.db`. The generated PDF sits in `filesDir` and is inside Google Auto Backup's scope — so it goes to the user's Google Drive. The PDF prints *"Generated fully offline, on-device — no data left this phone."* on page one.
 

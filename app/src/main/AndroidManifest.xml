@@ -25,27 +25,40 @@
          sufficient, no runtime grant or request is needed. -->
     <uses-permission android:name="android.permission.TRANSMIT_IR" />
 
-    <!-- Nothing else is declared. ACCESS_FINE_LOCATION and VIBRATE were declared for
-         features that were never built (no code path ever set InspectionEntity's
-         latitude/longitude, and there is no Vibrator call anywhere), so the app was
-         prompting for precise location on a privacy-first pitch and never using it.
+    <!-- Nothing else beyond what follows is declared. ACCESS_FINE_LOCATION and VIBRATE were
+         declared for features that were never built (no code path ever set
+         InspectionEntity's latitude/longitude, and there is no Vibrator call anywhere), so
+         the app was prompting for precise location on a privacy-first pitch and never using
+         it. Those two stay removed.
 
-         INTERNET and ACCESS_NETWORK_STATE are never declared by any source file here
-         either, but they were showing up granted on the installed build anyway:
+         INTERNET and ACCESS_NETWORK_STATE, below, are different: the product owner has
+         explicitly decided this app now syncs signed findings reports to a backend
+         (see com.smartlease.edge.sync), so the app genuinely reaches the network and these
+         permissions are real, not a merge artifact to suppress.
+
+         Before this change the app genuinely had no network access, and it is worth being
+         precise about why, because the reason is about to stop applying.
          com.google.mlkit:text-recognition pulls in
-         com.google.android.datatransport:transport-backend-cct, ML Kit's own telemetry
-         uploader, which merges both permissions in regardless of what this manifest asks
-         for. The OCR model itself is bundled on-device and never phones home — only its
-         unused CCT transport wanted the socket. Merger, not code, was granting network
-         access on a build whose entire pitch is that it can't. The removals below are
-         therefore load-bearing, not decorative: a future dependency bump (ML Kit, or
-         anything else pulling in transport-backend-cct) can silently reintroduce either
-         permission, and without this explicit `tools:node="remove"` it will merge back in
-         unnoticed. Verify against the merged manifest
-         (app/build/intermediates/merged_manifest/debug/processDebugMainManifest/AndroidManifest.xml),
-         not this source file, if that is ever in doubt. -->
-    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove" />
+         com.google.android.datatransport:transport-backend-cct (ML Kit's own telemetry
+         uploader), and that library's own manifest declares both permissions. The
+         `tools:node="remove"` that used to sit on the two lines below existed precisely to
+         strip them back out, and it worked: measured on 2026-09-12, the pre-change merged
+         manifest contained zero INTERNET entries, and `dumpsys package com.smartlease.edge`
+         against the installed build listed only TRANSMIT_IR, CAMERA, RECORD_AUDIO and an
+         internal broadcast permission. The OCR model itself is bundled on-device and never
+         phones home; only its unused CCT transport ever wanted the socket. That history matters for the
+         privacy story the sync feature still owes: com.smartlease.edge.sync sends only a
+         SHA-256 digest and small metadata (never photos, video, or audio, and never a
+         bitmap/byte-array field on its wire types), but ML Kit's own CCT transport is a
+         separate, unaudited path onto the same two permissions and is not covered by that
+         guarantee. If the sync feature is ever removed or gated off, reinstate
+         `tools:node="remove"` on both lines below rather than deleting them, so a dependency
+         bump cannot silently reopen network access the app no longer intends to use. Verify
+         against the merged manifest
+         (app/build/intermediates/merged_manifest/debug/processDebugMainManifest/AndroidManifest.xml)
+         if that is ever in doubt. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
         android:allowBackup="false"

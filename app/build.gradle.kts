@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
 }
 
@@ -99,10 +100,19 @@ dependencies {
     implementation(libs.pytorch.android.lite)
     implementation(libs.pytorch.torchvision.lite)
 
+    // Backend sync client (com.smartlease.edge.sync) -- uploads a digest + metadata only.
+    implementation(libs.retrofit.core)
+    implementation(libs.retrofit.kotlinx.serialization.converter)
+    implementation(libs.okhttp.core)
+    implementation(libs.kotlinx.serialization.json)
+
     testImplementation(libs.junit)
     // Real org.json for unit tests: the android.jar stub throws on every method, so the
     // acoustic model bundle could not be parsed off-device without it.
     testImplementation("org.json:json:20240303")
+    // Pure-JVM HTTP fixture for sync client tests -- no device, no real network.
+    testImplementation(libs.okhttp.mockwebserver)
+    testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 }

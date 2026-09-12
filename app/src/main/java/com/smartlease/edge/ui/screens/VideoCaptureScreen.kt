@@ -1,15 +1,6 @@
 package com.smartlease.edge.ui.screens
 
-import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.ImageFormat
-import android.graphics.Rect
-import android.graphics.YuvImage
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.ImageAnalysis
-import androidx.camera.core.ImageProxy
-import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.core.*
@@ -46,17 +37,27 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.content.ContextCompat
-import com.smartlease.edge.inspection360.ImageSharpnessEvaluator
 import com.smartlease.edge.ui.AppViewModel
 import com.smartlease.edge.ui.CapturedFrame
-import com.smartlease.edge.vision.DefectSegmenterFactory
+import com.smartlease.edge.ui.SegmenterState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.ByteArrayOutputStream
 import java.util.concurrent.Executors
+
+/**
+ * Hard cap on frames retained per surface recording. At the analyzer's ~1.2s sampling
+ * interval this is roughly 2.4 minutes of frames -- comfortably more than one surface
+ * walkthrough needs -- while bounding per-surface memory to ~36MB (120 thumbnails at
+ * ~0.3MB each, see [downscaleForThumbnail]) even if a recording runs long, instead of
+ * growing unbounded.
+ */
+private const val MAX_RETAINED_FRAMES_PER_SURFACE = 120
+
+/** Assumed real-world footprint of a sampled surface frame, used only for sq-ft estimates. */
+private const val FRAME_WIDTH_INCHES = 120f
+private const val FRAME_HEIGHT_INCHES = 160f
 
 @Composable
 fun VideoCaptureScreen(
@@ -72,18 +73,39 @@ fun VideoCaptureScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val coroutineScope = rememberCoroutineScope()
 
-    // Backend ML vision segmenter
-    val defectSegmenter = remember { DefectSegmenterFactory.create(context) }
+    // Backend ML vision segmenter: loaded once per app session in the ViewModel, off the
+    // main thread. This screen only observes the result and stays usable while it loads.
+    LaunchedEffect(Unit) {
+        viewModel.ensureSegmenterLoaded(context.applicationContext)
+    }
+    val segmenterState = viewModel.segmenterState
+    val readySegmenter = (segmenterState as? SegmenterState.Ready)?.segmenter
+    // Read via rememberUpdatedState so the CameraX analyzer callback (defined once, inside
+    // an AndroidView factory that only runs on first composition) always sees the latest
+    // value rather than whatever was ready at factory-creation time.
+    val currentSegmenter = rememberUpdatedState(readySegmenter)
 
     // Video & Frame States
     var recordingState by remember { mutableStateOf(RecordingState.IDLE) }
     var recordingFinished by remember { mutableStateOf(false) }
     val capturedFrames = remember { mutableStateListOf<CapturedFrame>() }
     var selectedFrameIndex by remember { mutableStateOf(0) }
-    
+
+    // Camera lifecycle: owned by this screen, torn down when it leaves composition.
+    val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
+    val cameraProviderRef = remember { mutableStateOf<ProcessCameraProvider?>(null) }
+    var cameraError by remember { mutableStateOf<String?>(null) }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            cameraProviderRef.value?.unbindAll()
+            analysisExecutor.shutdown()
+        }
+    }
+
     // Timer State
     var secondsElapsed by remember { mutableStateOf(0) }
-    
+
     LaunchedEffect(recordingState) {
         while (recordingState == RecordingState.RECORDING) {
             delay(1000)
@@ -105,24 +127,40 @@ fun VideoCaptureScreen(
                     context = ctx,
                     lifecycleOwner = lifecycleOwner,
                     previewView = previewView,
+                    analysisExecutor = analysisExecutor,
+                    onProviderReady = { provider -> cameraProviderRef.value = provider },
+                    onError = { message -> cameraError = message },
                     isRecording = { recordingState == RecordingState.RECORDING },
                     onFrameSampled = { bitmap, sharpness ->
-                        coroutineScope.launch(Dispatchers.Default) {
-                            val defects = defectSegmenter.segmentDefects(
-                                bitmap = bitmap,
-                                frameWidthInches = 120f,
-                                frameHeightInches = 160f
-                            )
-                            val newFrame = CapturedFrame(
-                                surfaceType = surfaceType,
-                                frameIndex = capturedFrames.size + 1,
-                                bitmap = bitmap,
-                                defects = defects,
-                                sharpness = sharpness,
-                                isTrainedModel = defectSegmenter.isTrainedModel
-                            )
-                            withContext(Dispatchers.Main) {
-                                capturedFrames.add(newFrame)
+                        val segmenter = currentSegmenter.value
+                        // Model still loading, or the per-surface memory budget has already
+                        // been reached: drop this sample rather than queue more work or
+                        // grow capturedFrames past its cap.
+                        if (segmenter != null && capturedFrames.size < MAX_RETAINED_FRAMES_PER_SURFACE) {
+                            coroutineScope.launch(Dispatchers.Default) {
+                                val defects = segmenter.segmentDefects(
+                                    bitmap = bitmap,
+                                    frameWidthInches = FRAME_WIDTH_INCHES,
+                                    frameHeightInches = FRAME_HEIGHT_INCHES
+                                )
+                                // Only a thumbnail is ever retained -- the full-resolution
+                                // bitmap is dropped (never recycled, since Compose may still
+                                // be reading it elsewhere in this same frame) once the scaled
+                                // copy exists.
+                                val thumbnail = downscaleForThumbnail(bitmap)
+                                val newFrame = CapturedFrame(
+                                    surfaceType = surfaceType,
+                                    frameIndex = capturedFrames.size + 1,
+                                    bitmap = thumbnail,
+                                    defects = defects,
+                                    sharpness = sharpness,
+                                    isTrainedModel = segmenter.isTrainedModel
+                                )
+                                withContext(Dispatchers.Main) {
+                                    if (capturedFrames.size < MAX_RETAINED_FRAMES_PER_SURFACE) {
+                                        capturedFrames.add(newFrame)
+                                    }
+                                }
                             }
                         }
                     }
@@ -130,6 +168,40 @@ fun VideoCaptureScreen(
                 previewView
             }
         )
+
+        // Camera failure: surfaced visibly instead of a silent black screen.
+        if (cameraError != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.85f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        Icons.Default.Warning,
+                        contentDescription = "Camera unavailable",
+                        tint = com.smartlease.edge.ui.theme.LampAmber,
+                        modifier = Modifier.size(40.dp)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Camera unavailable",
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = cameraError.orEmpty(),
+                        color = com.smartlease.edge.ui.theme.TextSecondaryUnified,
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 32.dp)
+                    )
+                }
+            }
+        }
 
         // Top HUD
         Row(
@@ -161,25 +233,36 @@ fun VideoCaptureScreen(
                     )
                 }
                 Spacer(modifier = Modifier.height(4.dp))
-                // Backend Model Badge
+                // Backend Model Badge -- shows a loading state until the session-scoped
+                // segmenter finishes initializing, then honestly labels which backend is live.
                 Box(
                     modifier = Modifier
                         .background(
-                            if (defectSegmenter.isTrainedModel) com.smartlease.edge.ui.theme.LampGreen.copy(alpha = 0.25f)
-                            else com.smartlease.edge.ui.theme.LampAmber.copy(alpha = 0.25f),
+                            when {
+                                readySegmenter == null -> com.smartlease.edge.ui.theme.LampAmber.copy(alpha = 0.25f)
+                                readySegmenter.isTrainedModel -> com.smartlease.edge.ui.theme.LampGreen.copy(alpha = 0.25f)
+                                else -> com.smartlease.edge.ui.theme.LampAmber.copy(alpha = 0.25f)
+                            },
                             RoundedCornerShape(8.dp)
                         )
                         .border(
                             1.dp,
-                            if (defectSegmenter.isTrainedModel) com.smartlease.edge.ui.theme.LampGreen.copy(alpha = 0.6f)
-                            else com.smartlease.edge.ui.theme.LampAmber.copy(alpha = 0.6f),
+                            when {
+                                readySegmenter == null -> com.smartlease.edge.ui.theme.LampAmber.copy(alpha = 0.6f)
+                                readySegmenter.isTrainedModel -> com.smartlease.edge.ui.theme.LampGreen.copy(alpha = 0.6f)
+                                else -> com.smartlease.edge.ui.theme.LampAmber.copy(alpha = 0.6f)
+                            },
                             RoundedCornerShape(8.dp)
                         )
                         .padding(horizontal = 8.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = if (defectSegmenter.isTrainedModel) "● YOLOv8-Seg Backend" else "● Heuristic Vision Backend",
-                        color = if (defectSegmenter.isTrainedModel) com.smartlease.edge.ui.theme.LampGreen else com.smartlease.edge.ui.theme.LampAmber,
+                        text = when {
+                            readySegmenter == null -> "● Preparing vision model…"
+                            readySegmenter.isTrainedModel -> "● YOLOv8-Seg Backend"
+                            else -> "● Heuristic Vision Backend"
+                        },
+                        color = if (readySegmenter?.isTrainedModel == true) com.smartlease.edge.ui.theme.LampGreen else com.smartlease.edge.ui.theme.LampAmber,
                         style = MaterialTheme.typography.labelSmall
                     )
                 }
@@ -340,15 +423,24 @@ fun VideoCaptureScreen(
                         Spacer(modifier = Modifier.size(48.dp))
                     }
 
-                    // Main Record/Stop Button
+                    // Main Record/Stop Button -- starting a new recording requires the vision
+                    // segmenter to be ready and the camera to have bound successfully; stopping
+                    // an already-running recording is always allowed.
+                    val canStartRecording = readySegmenter != null && cameraError == null
                     Box(
                         modifier = Modifier
                             .size(72.dp)
                             .border(4.dp, Color.White, CircleShape)
                             .padding(6.dp)
                             .clip(CircleShape)
-                            .background(if (recordingState == RecordingState.IDLE) com.smartlease.edge.ui.theme.LampRed else com.smartlease.edge.ui.theme.GlassUnified)
-                            .clickable {
+                            .background(
+                                when {
+                                    recordingState != RecordingState.IDLE -> com.smartlease.edge.ui.theme.GlassUnified
+                                    canStartRecording -> com.smartlease.edge.ui.theme.LampRed
+                                    else -> com.smartlease.edge.ui.theme.LampRed.copy(alpha = 0.35f)
+                                }
+                            )
+                            .clickable(enabled = recordingState != RecordingState.IDLE || canStartRecording) {
                                 if (recordingState == RecordingState.IDLE) {
                                     recordingState = RecordingState.RECORDING
                                 } else {
@@ -582,92 +674,4 @@ fun VideoCaptureScreen(
 
 enum class RecordingState {
     IDLE, RECORDING, PAUSED
-}
-
-private fun setupCameraWithAnalysis(
-    context: Context,
-    lifecycleOwner: androidx.lifecycle.LifecycleOwner,
-    previewView: PreviewView,
-    isRecording: () -> Boolean,
-    onFrameSampled: (Bitmap, Double) -> Unit
-) {
-    val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
-    val analysisExecutor = Executors.newSingleThreadExecutor()
-    var lastSampleTime = 0L
-
-    cameraProviderFuture.addListener({
-        val cameraProvider = cameraProviderFuture.get()
-        val preview = Preview.Builder().build().also {
-            it.setSurfaceProvider(previewView.surfaceProvider)
-        }
-
-        val imageAnalysis = ImageAnalysis.Builder()
-            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-            .build()
-
-        imageAnalysis.setAnalyzer(analysisExecutor) { imageProxy ->
-            try {
-                val now = System.currentTimeMillis()
-                if (isRecording() && (now - lastSampleTime >= 1200L)) {
-                    lastSampleTime = now
-                    
-                    // Compute Laplacian variance for sharpness
-                    val yBuffer = imageProxy.planes[0].buffer
-                    val sharpness = ImageSharpnessEvaluator.computeLaplacianVariance(
-                        yBuffer.duplicate(), imageProxy.width, imageProxy.height
-                    )
-
-                    // Convert frame to bitmap
-                    val bitmap = imageProxyToBitmap(imageProxy)
-                    if (bitmap != null) {
-                        onFrameSampled(bitmap, sharpness)
-                    }
-                }
-            } catch (e: Exception) {
-                // Ignore transient frame errors
-            } finally {
-                imageProxy.close()
-            }
-        }
-
-        val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
-        
-        try {
-            cameraProvider.unbindAll()
-            cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, preview, imageAnalysis)
-        } catch (exc: Exception) {
-            // Ignore setup errors
-        }
-    }, ContextCompat.getMainExecutor(context))
-}
-
-private fun imageProxyToBitmap(image: ImageProxy): Bitmap? {
-    return try {
-        // First try built-in CameraX converter
-        image.toBitmap()
-    } catch (e: Exception) {
-        try {
-            // YUV fallback
-            val yBuffer = image.planes[0].buffer
-            val uBuffer = image.planes[1].buffer
-            val vBuffer = image.planes[2].buffer
-
-            val ySize = yBuffer.remaining()
-            val uSize = uBuffer.remaining()
-            val vSize = vBuffer.remaining()
-
-            val nv21 = ByteArray(ySize + uSize + vSize)
-            yBuffer.get(nv21, 0, ySize)
-            vBuffer.get(nv21, ySize, vSize)
-            uBuffer.get(nv21, ySize + vSize, uSize)
-
-            val yuvImage = YuvImage(nv21, ImageFormat.NV21, image.width, image.height, null)
-            val out = ByteArrayOutputStream()
-            yuvImage.compressToJpeg(Rect(0, 0, yuvImage.width, yuvImage.height), 90, out)
-            val bytes = out.toByteArray()
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-        } catch (ex: Exception) {
-            null
-        }
-    }
 }
