@@ -8,6 +8,7 @@ activityCompose = "1.9.3"
 composeBom = "2024.12.01"
 camerax = "1.4.1"
 mlkitTextRecognition = "16.0.1"
+mlkitBarcodeScanning = "17.3.0"
 room = "2.7.2"
 coroutines = "1.9.0"
 navigationCompose = "2.8.5"
@@ -39,6 +40,10 @@ androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycl
 androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "camerax" }
 
 mlkit-text-recognition = { group = "com.google.mlkit", name = "text-recognition", version.ref = "mlkitTextRecognition" }
+
+# Bundled/on-device barcode model (not the Play-Services-streamed variant) -- ships the
+# model in the APK, same offline guarantee as mlkit-text-recognition above.
+mlkit-barcode-scanning = { group = "com.google.mlkit", name = "barcode-scanning", version.ref = "mlkitBarcodeScanning" }
 
 # QR encoding for the findings digest. com.google.zxing:core is pure Java with zero
 # transitive dependencies and no network, file or reflection code in the encoder path.

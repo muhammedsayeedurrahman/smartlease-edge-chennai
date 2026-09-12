@@ -35,6 +35,7 @@ import com.smartlease.edge.ui.theme.ReadoutValue
 fun HomeScreen(
     onStartWalkthrough: (SessionType) -> Unit,
     onOpenSelfTest: () -> Unit,
+    onOpenCountersign: () -> Unit,
     onOpenTapCapture: (() -> Unit)? = null
 ) {
     val insets = WindowInsets.systemBars.asPaddingValues()
@@ -125,6 +126,20 @@ fun HomeScreen(
             )
         ) {
             Text("Device & model check", style = MaterialTheme.typography.titleMedium)
+        }
+
+        // For the other party's phone: they have no session of their own on this device, only
+        // the first phone's QR to scan and sign. Reached from here rather than from a report
+        // screen because this phone may never have one.
+        Spacer(Modifier.height(10.dp))
+        OutlinedButton(
+            onClick = onOpenCountersign,
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+            colors = ButtonDefaults.outlinedButtonColors(
+                contentColor = MaterialTheme.colorScheme.onBackground
+            )
+        ) {
+            Text("Countersign a report (scan QR)", style = MaterialTheme.typography.titleMedium)
         }
 
         // Debug builds only: MainActivity passes null in release, so this never renders.

@@ -22,4 +22,12 @@ interface InspectionDao {
             "AND sessionType = :sessionType ORDER BY timestampEpochMillis DESC LIMIT 1"
     )
     suspend fun mostRecentSessionId(propertyLabel: String, sessionType: SessionType): String?
+
+    @Insert
+    suspend fun insertCountersignature(entity: CountersignatureEntity): Long
+
+    @Query(
+        "SELECT * FROM countersignatures WHERE sessionId = :sessionId ORDER BY capturedAtEpochMillis ASC"
+    )
+    suspend fun countersignaturesForSession(sessionId: String): List<CountersignatureEntity>
 }

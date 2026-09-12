@@ -14,6 +14,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.smartlease.edge.data.SessionType
 import com.smartlease.edge.report.InspectionReport
+import com.smartlease.edge.ui.screens.CountersignScreen
 import com.smartlease.edge.ui.screens.HomeScreen
 import com.smartlease.edge.ui.screens.ReportScreen
 import com.smartlease.edge.ui.screens.SelfTestScreen
@@ -66,6 +67,10 @@ fun SmartLeaseApp() {
                     navController.navigate("walkthrough")
                 },
                 onOpenSelfTest = { navController.navigate("selftest") },
+                // No report of its own on this device -- see CountersignScreen's own doc
+                // comment on why that must not be confused with whatever report was last
+                // viewed in this Activity.
+                onOpenCountersign = { navController.navigate("countersign_scan_only") },
                 onOpenTapCapture =
                     if (BuildConfig.DEBUG) ({ navController.navigate("tapcapture") }) else null
             )
@@ -98,8 +103,15 @@ fun SmartLeaseApp() {
         ) {
             ReportScreen(
                 report = loadedReport,
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onCountersign = { navController.navigate("countersign") }
             )
+        }
+        composable("countersign") {
+            CountersignScreen(report = loadedReport, onBack = { navController.popBackStack() })
+        }
+        composable("countersign_scan_only") {
+            CountersignScreen(report = null, onBack = { navController.popBackStack() })
         }
     }
 }

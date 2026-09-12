@@ -4,8 +4,11 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.pdf.PdfDocument
+import android.os.Build
 import android.text.StaticLayout
 import android.text.TextPaint
+import com.smartlease.edge.BuildConfig
+import com.smartlease.edge.data.CountersignatureEntity
 import com.smartlease.edge.data.InspectionEntity
 import com.smartlease.edge.deduction.DeductionEngine
 import com.smartlease.edge.deduction.DeductionLine
@@ -74,7 +77,9 @@ object ReportGenerator {
             overallVerdict = verdict,
             findingsSha256 = FindingsDigest.sha256Hex(sessionId, findings),
             findingCount = findings.size,
-            deductions = depositRupees?.let { DeductionEngine.summarise(it, findings, baselineKeys) }
+            deductions = depositRupees?.let { DeductionEngine.summarise(it, findings, baselineKeys) },
+            earliestFindingEpochMillis = findings.minOfOrNull { it.timestampEpochMillis },
+            latestFindingEpochMillis = findings.maxOfOrNull { it.timestampEpochMillis }
         )
     }
 
@@ -95,7 +100,11 @@ object ReportGenerator {
                 "Severity breakdown: $severities."
     }
 
-    fun renderToPdf(context: Context, report: InspectionReport): File {
+    fun renderToPdf(
+        context: Context,
+        report: InspectionReport,
+        countersignatures: List<CountersignatureEntity> = emptyList()
+    ): File {
         val document = PdfDocument()
         val titlePaint = Paint().apply { textSize = 20f; isFakeBoldText = true }
         val metaPaint = Paint().apply { textSize = 10f; color = 0xFF666666.toInt() }
@@ -156,6 +165,26 @@ object ReportGenerator {
             y = MARGIN.toFloat()
         }
         drawVerificationBlock(canvas, report, y)
+
+        // Section 63 certificate, device attestation and any countersignatures each read as
+        // their own document, not a continuation of the findings above -- always start them
+        // on a fresh page rather than packing them under whatever space is left.
+        drawFooter(canvas, report, pageNumber)
+        document.finishPage(page)
+        pageNumber++
+        page = document.startPage(PdfDocument.PageInfo.Builder(PAGE_WIDTH, PAGE_HEIGHT, pageNumber).create())
+        canvas = page.canvas
+        y = MARGIN.toFloat()
+
+        val closingCursor = PdfCursor(document, page, canvas, pageNumber, y)
+        drawSection63Certificate(closingCursor, report)
+        drawDeviceAttestation(closingCursor, report)
+        if (countersignatures.isNotEmpty()) {
+            drawCountersignatures(closingCursor, report, countersignatures)
+        }
+        page = closingCursor.page
+        canvas = closingCursor.canvas
+        pageNumber = closingCursor.pageNumber
 
         drawFooter(canvas, report, pageNumber)
         document.finishPage(page)
@@ -372,5 +401,201 @@ object ReportGenerator {
         layout.draw(cursor.canvas)
         cursor.canvas.restore()
         cursor.y += layout.height + 16
+    }
+
+    /** Wraps [text] at the cursor's position and advances it past the drawn block, plus [gap]. */
+    private fun PdfCursor.drawWrapped(text: String, paint: TextPaint, gap: Int = 8) {
+        val layout = StaticLayout.Builder
+            .obtain(text, 0, text.length, paint, PAGE_WIDTH - MARGIN * 2)
+            .build()
+        canvas.save()
+        canvas.translate(MARGIN.toFloat(), y)
+        layout.draw(canvas)
+        canvas.restore()
+        y += layout.height + gap
+    }
+
+    /**
+     * Draft certificate under Section 63 of the Bharatiya Sakshya Adhiniyam, 2023, which
+     * requires a certificate identifying the device and its manner of production before
+     * device-generated electronic evidence is admissible. This app cannot self-certify -- BSA
+     * 2023 requires the certificate to be signed by "the person occupying a responsible
+     * official position in relation to the operation of the device" -- so this page is
+     * populated automatically from device and app data and labelled a draft, with blank
+     * lines below for that person to complete by hand.
+     */
+    private fun drawSection63Certificate(cursor: PdfCursor, report: InspectionReport) {
+        val headerPaint = TextPaint().apply { textSize = 13f; isFakeBoldText = true }
+        val bodyPaint = TextPaint().apply { textSize = 9.5f }
+        val boldBodyPaint = TextPaint(bodyPaint).apply { isFakeBoldText = true }
+        val labelPaint = TextPaint().apply { textSize = 9f; color = 0xFF666666.toInt() }
+
+        cursor.breakPageIfBelow(report, 200)
+        cursor.canvas.drawText(
+            "Certificate under Section 63, Bharatiya Sakshya Adhiniyam, 2023",
+            MARGIN.toFloat(), cursor.y, headerPaint
+        )
+        cursor.y += 18
+
+        cursor.drawWrapped(
+            "DRAFT -- generated automatically from this device and app. It becomes a Section 63 " +
+                "certificate only once reviewed and signed below by the person responsible for " +
+                "operating this device; this app cannot certify itself.",
+            boldBodyPaint
+        )
+        cursor.y += 4
+
+        val captureWindow = if (
+            report.earliestFindingEpochMillis != null && report.latestFindingEpochMillis != null
+        ) {
+            val fmt = SimpleDateFormat("d MMM yyyy, HH:mm:ss", Locale.getDefault())
+            "${fmt.format(Date(report.earliestFindingEpochMillis))} to " +
+                fmt.format(Date(report.latestFindingEpochMillis))
+        } else {
+            "no findings recorded"
+        }
+
+        val fields = listOf(
+            "Device" to "${Build.MANUFACTURER} ${Build.MODEL}",
+            "Operating system" to "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})",
+            "Producing application" to "SmartLease Edge ${BuildConfig.VERSION_NAME}",
+            "Manner of production" to ("Captured on-device (camera, microphone, IR emitter, motion " +
+                "sensors) and recorded to local app storage; no network transmission at any point."),
+            "Capture window" to captureWindow,
+            "Session identifier" to report.sessionId,
+            "Findings digest (SHA-256)" to report.findingsSha256
+        )
+        fields.forEach { (label, value) ->
+            cursor.breakPageIfBelow(report, 80)
+            cursor.canvas.drawText(label, MARGIN.toFloat(), cursor.y, labelPaint)
+            cursor.y += 12
+            cursor.drawWrapped(value, bodyPaint, gap = 6)
+        }
+
+        cursor.y += 6
+        cursor.breakPageIfBelow(report, 110)
+        cursor.canvas.drawText("To be completed by hand:", MARGIN.toFloat(), cursor.y, labelPaint)
+        cursor.y += 18
+        listOf("Name", "Capacity / designation", "Date", "Signature").forEach { line ->
+            cursor.breakPageIfBelow(report, 40)
+            cursor.canvas.drawText(
+                "$line: ______________________________", MARGIN.toFloat(), cursor.y, bodyPaint
+            )
+            cursor.y += 20
+        }
+        cursor.y += 12
+    }
+
+    /**
+     * Hardware-backed device signature over the findings digest -- see [ReportSigner]. Signing
+     * runs fresh at every render (ECDSA is randomized, so re-rendering the same report twice
+     * yields two different but equally valid signatures over the same digest) and is wrapped
+     * so a KeyStore failure on some device degrades this section rather than the whole render.
+     */
+    private fun drawDeviceAttestation(cursor: PdfCursor, report: InspectionReport) {
+        val headerPaint = TextPaint().apply { textSize = 13f; isFakeBoldText = true }
+        val bodyPaint = TextPaint().apply { textSize = 9.5f }
+        val labelPaint = TextPaint().apply { textSize = 9f; color = 0xFF666666.toInt() }
+        val monoPaint = TextPaint(bodyPaint).apply {
+            typeface = android.graphics.Typeface.MONOSPACE
+            textSize = 8f
+        }
+
+        cursor.breakPageIfBelow(report, 160)
+        cursor.canvas.drawText("Device-signed attestation", MARGIN.toFloat(), cursor.y, headerPaint)
+        cursor.y += 18
+
+        val attestation = runCatching { ReportSigner.sign(report.findingsSha256) }.getOrNull()
+        if (attestation == null) {
+            cursor.drawWrapped(
+                "Not available on this device -- the AndroidKeyStore signing call failed. The " +
+                    "SHA-256 digest above is still a valid integrity check; it is simply not " +
+                    "device-signed on this copy of the report.",
+                bodyPaint
+            )
+            return
+        }
+
+        val hardwareNote = if (attestation.hardwareBacked) {
+            "confirmed hardware-backed"
+        } else {
+            "hardware backing not confirmed on this device"
+        }
+        cursor.drawWrapped(
+            "The findings digest above was signed with a private key generated inside this " +
+                "device's secure hardware ($hardwareNote) and never exported from it. This proves " +
+                "the signature was produced by this specific phone; it does not identify who was " +
+                "operating it. Play Integrity was deliberately not used here -- it requires a " +
+                "network round-trip this app cannot make, since it declares no INTERNET permission.",
+            bodyPaint
+        )
+
+        cursor.canvas.drawText("Signature (ECDSA / SHA-256, Base64)", MARGIN.toFloat(), cursor.y, labelPaint)
+        cursor.y += 12
+        cursor.drawWrapped(attestation.signatureBase64, monoPaint, gap = 6)
+
+        cursor.canvas.drawText(
+            "${attestation.certificateChainBase64.size} certificate(s) in the attestation chain.",
+            MARGIN.toFloat(), cursor.y, labelPaint
+        )
+        cursor.y += 16
+    }
+
+    /**
+     * Countersignatures captured via the two-phone QR handshake
+     * ([com.smartlease.edge.report.CountersignPayload]), re-verified against this report's
+     * current digest at render time rather than trusted from storage -- a signature captured
+     * against an earlier version of this report (findings changed since) is shown as invalid
+     * rather than silently listed as good.
+     */
+    private fun drawCountersignatures(
+        cursor: PdfCursor,
+        report: InspectionReport,
+        countersignatures: List<CountersignatureEntity>
+    ) {
+        val headerPaint = TextPaint().apply { textSize = 13f; isFakeBoldText = true }
+        val bodyPaint = TextPaint().apply { textSize = 9.5f }
+        val labelPaint = TextPaint().apply { textSize = 9f; color = 0xFF666666.toInt() }
+        val warnPaint = TextPaint().apply { textSize = 9.5f; color = 0xFFAA2200.toInt() }
+
+        cursor.breakPageIfBelow(report, 140)
+        cursor.canvas.drawText("Joint-inspection countersignatures", MARGIN.toFloat(), cursor.y, headerPaint)
+        cursor.y += 18
+        cursor.drawWrapped(
+            "Each entry below is a signature from a second phone's own secure hardware over " +
+                "this report's findings digest, captured via a QR code scanned between the two " +
+                "devices. It proves a specific device signed this digest; it does not identify " +
+                "a person.",
+            bodyPaint
+        )
+
+        countersignatures.forEachIndexed { index, entry ->
+            cursor.breakPageIfBelow(report, 90)
+            val stillMatchesDigest = entry.digestHex == report.findingsSha256
+            val verified = stillMatchesDigest &&
+                ReportSigner.verify(entry.digestHex, entry.signatureBase64, entry.certificateBase64)
+
+            val stamp = SimpleDateFormat("d MMM yyyy, HH:mm", Locale.getDefault())
+                .format(Date(entry.capturedAtEpochMillis))
+            cursor.canvas.drawText(
+                "Countersignature ${index + 1} -- captured $stamp", MARGIN.toFloat(), cursor.y, labelPaint
+            )
+            cursor.y += 13
+
+            if (!verified) {
+                val reason = if (!stillMatchesDigest) {
+                    "does not match this report's current findings digest -- ignored"
+                } else {
+                    "signature did not verify -- ignored"
+                }
+                cursor.drawWrapped("INVALID -- $reason.", warnPaint, gap = 6)
+            } else {
+                cursor.drawWrapped(
+                    "Valid. Hardware-backed key: ${if (entry.hardwareBacked) "yes" else "not confirmed"}.",
+                    bodyPaint,
+                    gap = 6
+                )
+            }
+        }
     }
 }

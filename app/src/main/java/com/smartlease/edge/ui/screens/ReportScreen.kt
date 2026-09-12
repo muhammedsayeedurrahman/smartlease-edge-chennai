@@ -65,7 +65,7 @@ import java.util.Locale
  * none -- it is the exact claim that would collapse under scrutiny in a dispute.
  */
 @Composable
-fun ReportScreen(report: InspectionReport?, onBack: () -> Unit) {
+fun ReportScreen(report: InspectionReport?, onBack: () -> Unit, onCountersign: () -> Unit = {}) {
     val insets = WindowInsets.systemBars.asPaddingValues()
     val context = LocalContext.current
     var shareError by remember { mutableStateOf<String?>(null) }
@@ -271,6 +271,14 @@ fun ReportScreen(report: InspectionReport?, onBack: () -> Unit) {
                     modifier = Modifier.fillMaxWidth().height(52.dp)
                 ) {
                     Text("Share report (PDF)", style = MaterialTheme.typography.titleMedium)
+                }
+
+                Spacer(Modifier.height(8.dp))
+                TextButton(
+                    onClick = onCountersign,
+                    modifier = Modifier.fillMaxWidth().height(48.dp)
+                ) {
+                    Text("Countersign with another phone", style = MaterialTheme.typography.titleMedium)
                 }
 
                 shareError?.let {
