@@ -1,5 +1,6 @@
 package com.smartlease.edge.ui.screens
 
+import kotlinx.coroutines.launch
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -11,10 +12,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Apartment
+import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material.icons.rounded.CloudUpload
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.House
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -37,6 +40,31 @@ fun HomeScreen(
 ) {
     val properties = viewModel.properties
 
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    val exportLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/zip")
+    ) { uri ->
+        uri?.let { 
+            scope.launch {
+                com.smartlease.edge.data.drive.GoogleDriveBackupHelper(context).exportFullBackupToDrive(it)
+                android.widget.Toast.makeText(context, "Export complete", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    val importLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let {
+            scope.launch {
+                com.smartlease.edge.data.drive.GoogleDriveBackupHelper(context).importBackupFromDrive(it)
+                android.widget.Toast.makeText(context, "Import merged successfully", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -49,8 +77,33 @@ fun HomeScreen(
                     IconButton(onClick = onOpenSelfTest) {
                         Icon(Icons.Rounded.Info, contentDescription = "Self-test")
                     }
-                    IconButton(onClick = { /* TODO: Open Google Drive Backup BottomSheet */ }) {
-                        Icon(Icons.Rounded.CloudUpload, contentDescription = "Google Drive Backup")
+                    var driveMenuExpanded by remember { mutableStateOf(false) }
+                    Box {
+                        IconButton(onClick = { driveMenuExpanded = true }) {
+                            Icon(Icons.Rounded.CloudUpload, contentDescription = "Google Drive Backup")
+                        }
+                        DropdownMenu(
+                            expanded = driveMenuExpanded,
+                            onDismissRequest = { driveMenuExpanded = false },
+                            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Export to Drive") },
+                                onClick = { 
+                                    driveMenuExpanded = false
+                                    exportLauncher.launch("SmartLease_Backup.zip")
+                                },
+                                leadingIcon = { Icon(Icons.Rounded.CloudUpload, contentDescription = null) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Import from Drive") },
+                                onClick = { 
+                                    driveMenuExpanded = false
+                                    importLauncher.launch(arrayOf("application/zip", "application/octet-stream"))
+                                },
+                                leadingIcon = { Icon(Icons.Rounded.CloudDownload, contentDescription = null) }
+                            )
+                        }
                     }
                     var expanded by remember { mutableStateOf(false) }
                     Box {
@@ -151,7 +204,11 @@ fun HomeScreen(
                     modifier = Modifier.fillMaxSize()
                 ) {
                     items(properties) { property ->
-                        PropertyItemCard(property = property, onClick = { onPropertySelected(property.id) })
+                        PropertyItemCard(
+                            property = property, 
+                            onClick = { onPropertySelected(property.id) },
+                            onDelete = { viewModel.deleteProperty(property.id) }
+                        )
                     }
                 }
             }
@@ -198,7 +255,7 @@ fun PropertyTypeCard(
 }
 
 @Composable
-fun PropertyItemCard(property: Property, onClick: () -> Unit) {
+fun PropertyItemCard(property: Property, onClick: () -> Unit, onDelete: () -> Unit) {
     ElevatedCard(
         modifier = Modifier
             .fillMaxWidth()
@@ -231,6 +288,13 @@ fun PropertyItemCard(property: Property, onClick: () -> Unit) {
                 Text(property.name, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(property.location, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            IconButton(onClick = onDelete) {
+                Icon(
+                    imageVector = Icons.Rounded.Delete,
+                    contentDescription = "Delete",
+                    tint = MaterialTheme.colorScheme.error
+                )
             }
         }
     }

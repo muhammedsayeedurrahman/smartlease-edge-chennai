@@ -28,4 +28,10 @@ interface PropertyDao {
 
     @Query("SELECT * FROM rental_agreements WHERE propertyId = :propertyId LIMIT 1")
     suspend fun getRentalAgreementForProperty(propertyId: String): RentalAgreementEntity?
+
+    @Query("DELETE FROM properties WHERE id = :propertyId")
+    suspend fun deleteProperty(propertyId: String)
+
+    @Query("DELETE FROM areas WHERE id = :areaId")
+    suspend fun deleteArea(areaId: String)
 }

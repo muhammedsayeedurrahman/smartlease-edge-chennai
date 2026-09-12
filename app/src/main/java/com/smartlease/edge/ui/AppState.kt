@@ -29,6 +29,7 @@ data class CapturedFrame(
     val frameIndex: Int,
     val timestampMs: Long = System.currentTimeMillis(),
     val bitmap: Bitmap,
+    val filePath: String? = null,
     val defects: List<DefectSegmenter.Defect> = emptyList(),
     val sharpness: Double = 0.0,
     // No default: overclaiming a trained model is a correctness bug in this project, so
@@ -57,7 +58,11 @@ data class Room(
     val topRecorded: Boolean = false,
     val bottomRecorded: Boolean = false,
     val sidesRecorded: Boolean = false,
-    val frames: List<CapturedFrame> = emptyList()
+    val moveInFrames: List<CapturedFrame> = emptyList(),
+    val topMoveOutRecorded: Boolean = false,
+    val bottomMoveOutRecorded: Boolean = false,
+    val sidesMoveOutRecorded: Boolean = false,
+    val moveOutFrames: List<CapturedFrame> = emptyList()
 )
 
 /**
@@ -93,9 +98,33 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             for (p in dbProperties) {
                 val dbRooms = dao.getAreasForProperty(p.id)
                 allRooms.addAll(dbRooms.map {
-                    Room(it.id, it.propertyId, it.name, 
-                         sqFt = if (it.height != null) "${it.length * it.breadth * it.height}" else "${it.length * it.breadth}",
-                         length = it.length.toString(), width = it.breadth.toString(), height = it.height?.toString() ?: "")
+                    val sqFtStr = if (it.height != null && it.height > 0.0) {
+                        String.format("%.2f", it.length * it.breadth * it.height)
+                    } else if (it.length > 0.0 && it.breadth > 0.0) {
+                        String.format("%.2f", it.length * it.breadth)
+                    } else {
+                        ""
+                    }
+                    val mInFrames = it.moveInFrames
+                    val mOutFrames = it.moveOutFrames
+                    
+                    Room(
+                        id = it.id, 
+                        propertyId = it.propertyId, 
+                        type = it.name, 
+                        sqFt = sqFtStr,
+                        length = if (it.length > 0.0) it.length.toString() else "", 
+                        width = if (it.breadth > 0.0) it.breadth.toString() else "", 
+                        height = if (it.height != null && it.height > 0.0) it.height.toString() else "",
+                        moveInFrames = mInFrames,
+                        moveOutFrames = mOutFrames,
+                        topRecorded = mInFrames.any { f -> f.surfaceType == "Top" },
+                        bottomRecorded = mInFrames.any { f -> f.surfaceType == "Bottom" },
+                        sidesRecorded = mInFrames.any { f -> f.surfaceType == "Sides" },
+                        topMoveOutRecorded = mOutFrames.any { f -> f.surfaceType == "Top" },
+                        bottomMoveOutRecorded = mOutFrames.any { f -> f.surfaceType == "Bottom" },
+                        sidesMoveOutRecorded = mOutFrames.any { f -> f.surfaceType == "Sides" }
+                    )
                 })
             }
             withContext(Dispatchers.Main) {
@@ -170,7 +199,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 name = room.type,
                 length = room.length.toDoubleOrNull() ?: 0.0,
                 breadth = room.width.toDoubleOrNull() ?: 0.0,
-                height = room.height.toDoubleOrNull()
+                height = room.height.toDoubleOrNull(),
+                moveInFrames = room.moveInFrames,
+                moveOutFrames = room.moveOutFrames
             ))
         }
     }
@@ -186,23 +217,45 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     name = updatedRoom.type,
                     length = updatedRoom.length.toDoubleOrNull() ?: 0.0,
                     breadth = updatedRoom.width.toDoubleOrNull() ?: 0.0,
-                    height = updatedRoom.height.toDoubleOrNull()
+                    height = updatedRoom.height.toDoubleOrNull(),
+                    moveInFrames = updatedRoom.moveInFrames,
+                    moveOutFrames = updatedRoom.moveOutFrames
                 ))
             }
         }
     }
     
-    fun addFramesToRoom(roomId: String, newFrames: List<CapturedFrame>) {
+    fun addFramesToRoom(roomId: String, sessionType: String, newFrames: List<CapturedFrame>) {
         val index = rooms.indexOfFirst { it.id == roomId }
         if (index != -1) {
             val existing = rooms[index]
-            val updatedFrames = existing.frames + newFrames
-            rooms[index] = existing.copy(frames = updatedFrames)
+            val updated = if (sessionType == "MOVE_OUT") {
+                existing.copy(moveOutFrames = existing.moveOutFrames + newFrames)
+            } else {
+                existing.copy(moveInFrames = existing.moveInFrames + newFrames)
+            }
+            // Use updateRoom to persist it
+            updateRoom(updated)
         }
     }
     
     fun getRoomsForProperty(propertyId: String): List<Room> {
         return rooms.filter { it.propertyId == propertyId }
+    }
+
+    fun deleteProperty(propertyId: String) {
+        properties.removeAll { it.id == propertyId }
+        rooms.removeAll { it.propertyId == propertyId }
+        backgroundScope.launch {
+            dao.deleteProperty(propertyId)
+        }
+    }
+
+    fun deleteRoom(roomId: String) {
+        rooms.removeAll { it.id == roomId }
+        backgroundScope.launch {
+            dao.deleteArea(roomId)
+        }
     }
 }
 

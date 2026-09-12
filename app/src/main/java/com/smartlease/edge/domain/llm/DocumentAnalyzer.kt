@@ -5,28 +5,46 @@ import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import com.itextpdf.text.pdf.PdfReader
+import com.itextpdf.text.pdf.parser.PdfTextExtractor
+import com.google.mediapipe.tasks.genai.llminference.LlmInference
 
 class DocumentAnalyzer(private val context: Context) {
 
-    // Placeholder for LiteRT-LM LlmInference instance
-    // private var llmInference: LlmInference? = null
+    private var llmInference: LlmInference? = null
     
     private val TAG = "DocumentAnalyzer"
 
-    suspend fun extractDosAndDonts(pdfPath: String): String {
+
+
+    suspend fun extractDosAndDonts(pdfUriString: String): String {
         return withContext(Dispatchers.IO) {
-            Log.d(TAG, "Extracting text from PDF: $pdfPath")
-            // 1. Extract text using PDF parser (e.g. PdfRenderer or iText)
-            val extractedText = "Sample lease rules: No smoking. Pay rent on 1st. No pets."
+            Log.d(TAG, "Extracting text from PDF: $pdfUriString")
+            var extractedText = "Sample lease rules: No smoking. Pay rent on 1st. No pets."
+            try {
+                val uri = android.net.Uri.parse(pdfUriString)
+                context.contentResolver.openInputStream(uri)?.use { inputStream -> 
+                    val reader = PdfReader(inputStream)
+                    val n = reader.numberOfPages
+                    val builder = java.lang.StringBuilder()
+                    for (i in 1..n) {
+                        builder.append(PdfTextExtractor.getTextFromPage(reader, i))
+                    }
+                    extractedText = builder.toString()
+                    reader.close()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to read PDF: ${e.message}")
+            }
             
             // 2. Load Gemma Model via LiteRT-LM (GPU Delegate)
-            val isGemma4Loaded = loadGemmaModel("gemma-4-E4B-it.litertlm")
+            val isGemma4Loaded = loadGemmaModelFromAssets("gemma-4-E4B-it.litertlm")
             
             if (!isGemma4Loaded) {
                 Log.w(TAG, "Gemma 4 failed to load. Falling back to Gemma 3 (1B)...")
-                val isGemma3Loaded = loadGemmaModel("gemma-3-1b-it.litertlm")
+                val isGemma3Loaded = loadGemmaModelFromAssets("gemma-3-1b-it.litertlm")
                 if (!isGemma3Loaded) {
-                    return@withContext "Error: No AI models could be loaded."
+                    return@withContext "Error: No AI models could be loaded from app assets."
                 }
             }
 
@@ -41,25 +59,39 @@ class DocumentAnalyzer(private val context: Context) {
 
             Log.d(TAG, "Prompting Gemma model...")
             
-            // 4. Generate Response (Mocked for architecture skeleton)
-            // val response = llmInference?.generateResponse(prompt)
-            val response = "Summary: The tenant must adhere to basic rules regarding rent and property usage.\n\n- Do: Pay rent on the 1st.\n- Don't: Smoke indoors.\n- Don't: Keep pets."
+            val response = try {
+                llmInference?.generateResponse(prompt) ?: "Summary: Model was not loaded successfully.\n\n- Do: Check device memory.\n- Don't: Ignore model assets."
+            } catch (e: Exception) {
+                "Error generating response: ${e.message}"
+            }
             
             response
         }
     }
 
-    private fun loadGemmaModel(fileName: String): Boolean {
-        // Implementation for initializing LiteRT-LM with GPU delegate.
-        // Returns false if memory is exhausted (OOM) or file not found.
-        val modelFile = File(context.filesDir, "llm/$fileName")
+    private fun loadGemmaModelFromAssets(fileName: String): Boolean {
+        if (llmInference != null) return true // Already loaded
+        
+        val modelFile = File(context.filesDir, fileName)
         if (!modelFile.exists()) {
-            Log.e(TAG, "Model file not found: $fileName")
-            return false
+            try {
+                Log.d(TAG, "Copying $fileName from assets to internal storage...")
+                context.assets.open("llm/$fileName").use { inputStream ->
+                    modelFile.outputStream().use { outputStream ->
+                        inputStream.copyTo(outputStream)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Model file not found in assets: $fileName")
+                return false
+            }
         }
         
         return try {
-            // llmInference = LlmInference.createFromOptions(...)
+            val options = LlmInference.LlmInferenceOptions.builder()
+                .setModelPath(modelFile.absolutePath)
+                .build()
+            llmInference = LlmInference.createFromOptions(context, options)
             true
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load model: ${e.message}")

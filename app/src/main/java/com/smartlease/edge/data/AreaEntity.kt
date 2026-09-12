@@ -23,5 +23,7 @@ data class AreaEntity(
     val breadth: Double,
     val height: Double?,
     val moveInVideoPath: String? = null,
-    val moveOutVideoPath: String? = null
+    val moveOutVideoPath: String? = null,
+    val moveInFrames: List<com.smartlease.edge.ui.CapturedFrame> = emptyList(),
+    val moveOutFrames: List<com.smartlease.edge.ui.CapturedFrame> = emptyList()
 )

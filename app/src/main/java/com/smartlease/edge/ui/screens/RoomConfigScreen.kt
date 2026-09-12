@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import com.smartlease.edge.ui.AppViewModel
 import com.smartlease.edge.ui.Room
 
@@ -32,8 +33,9 @@ import com.smartlease.edge.ui.Room
 fun RoomConfigScreen(
     viewModel: AppViewModel,
     roomId: String,
+    sessionType: String,
     onBack: () -> Unit,
-    onRecordSurface: (roomId: String, surfaceType: String) -> Unit
+    onRecordSurface: (roomId: String, surfaceType: String, sessionType: String) -> Unit
 ) {
     val room = viewModel.rooms.find { it.id == roomId } ?: return
     
@@ -43,6 +45,8 @@ fun RoomConfigScreen(
     var width by remember { mutableStateOf(room.width) }
     var length by remember { mutableStateOf(room.length) }
     var damages by remember { mutableStateOf(room.damages) }
+    
+    var showActionDialogFor by remember { mutableStateOf<String?>(null) }
 
     // Dynamic square footage calculation
     LaunchedEffect(width, length, height) {
@@ -115,7 +119,8 @@ fun RoomConfigScreen(
                         onValueChange = {}, 
                         label = "Total Sq Ft", 
                         keyboardType = KeyboardType.Number,
-                        readOnly = true
+                        readOnly = true,
+                        enabled = false
                     )
                 }
             }
@@ -223,35 +228,73 @@ fun RoomConfigScreen(
             Text("Record Surfaces", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
             Spacer(modifier = Modifier.height(16.dp))
 
-            val topFrames = room.frames.filter { it.surfaceType == "Top" }
-            val bottomFrames = room.frames.filter { it.surfaceType == "Bottom" }
-            val sidesFrames = room.frames.filter { it.surfaceType == "Sides" }
+            val frames = if (sessionType == "MOVE_OUT") room.moveOutFrames else room.moveInFrames
+            val topFrames = frames.filter { it.surfaceType == "Top" }
+            val bottomFrames = frames.filter { it.surfaceType == "Bottom" }
+            val sidesFrames = frames.filter { it.surfaceType == "Sides" }
 
             SurfaceRecordCard(
-                title = "Top Wall (Ceiling)",
-                isRecorded = room.topRecorded,
+                title = "Top Wall (Ceiling) - $sessionType",
+                isRecorded = if (sessionType == "MOVE_OUT") room.topMoveOutRecorded else room.topRecorded,
                 frameCount = topFrames.size,
                 defectCount = topFrames.sumOf { it.defects.size },
-                onClick = { onRecordSurface(room.id, "Top") }
+                onClick = {
+                    if ((if (sessionType == "MOVE_OUT") room.topMoveOutRecorded else room.topRecorded)) {
+                        showActionDialogFor = "Top"
+                    } else {
+                        onRecordSurface(room.id, "Top", sessionType)
+                    }
+                }
             )
             Spacer(modifier = Modifier.height(12.dp))
             SurfaceRecordCard(
-                title = "Bottom Wall (Floor)",
-                isRecorded = room.bottomRecorded,
+                title = "Bottom Wall (Floor) - $sessionType",
+                isRecorded = if (sessionType == "MOVE_OUT") room.bottomMoveOutRecorded else room.bottomRecorded,
                 frameCount = bottomFrames.size,
                 defectCount = bottomFrames.sumOf { it.defects.size },
-                onClick = { onRecordSurface(room.id, "Bottom") }
+                onClick = {
+                    if ((if (sessionType == "MOVE_OUT") room.bottomMoveOutRecorded else room.bottomRecorded)) {
+                        showActionDialogFor = "Bottom"
+                    } else {
+                        onRecordSurface(room.id, "Bottom", sessionType)
+                    }
+                }
             )
             Spacer(modifier = Modifier.height(12.dp))
             SurfaceRecordCard(
-                title = "Side Walls",
-                isRecorded = room.sidesRecorded,
+                title = "Side Walls - $sessionType",
+                isRecorded = if (sessionType == "MOVE_OUT") room.sidesMoveOutRecorded else room.sidesRecorded,
                 frameCount = sidesFrames.size,
                 defectCount = sidesFrames.sumOf { it.defects.size },
-                onClick = { onRecordSurface(room.id, "Sides") }
+                onClick = {
+                    if ((if (sessionType == "MOVE_OUT") room.sidesMoveOutRecorded else room.sidesRecorded)) {
+                        showActionDialogFor = "Sides"
+                    } else {
+                        onRecordSurface(room.id, "Sides", sessionType)
+                    }
+                }
             )
             
             Spacer(modifier = Modifier.height(32.dp))
+        }
+    }
+    
+    if (showActionDialogFor != null) {
+        Dialog(onDismissRequest = { showActionDialogFor = null }) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                val surfaceFrames = when (showActionDialogFor) {
+                    "Top" -> if (sessionType == "MOVE_OUT") room.moveOutFrames.filter { it.surfaceType == "Top" } else room.moveInFrames.filter { it.surfaceType == "Top" }
+                    "Bottom" -> if (sessionType == "MOVE_OUT") room.moveOutFrames.filter { it.surfaceType == "Bottom" } else room.moveInFrames.filter { it.surfaceType == "Bottom" }
+                    "Sides" -> if (sessionType == "MOVE_OUT") room.moveOutFrames.filter { it.surfaceType == "Sides" } else room.moveInFrames.filter { it.surfaceType == "Sides" }
+                    else -> emptyList()
+                }
+
+                InspectionCompleteOverlay(
+                    surfaceType = showActionDialogFor!!,
+                    capturedFrames = surfaceFrames,
+                    onExit = { showActionDialogFor = null }
+                )
+            }
         }
     }
 }

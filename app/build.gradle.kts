@@ -78,6 +78,7 @@ android {
         // .ptl model files are already compressed archives; letting aapt re-compress them
         // breaks LiteModuleLoader's ability to mmap them straight out of the APK.
         noCompress += "ptl"
+        noCompress += "litertlm"
     }
 }
 
@@ -172,4 +173,6 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+    implementation("com.itextpdf:itextg:5.5.10")
+    implementation("com.google.code.gson:gson:2.10.1")
 }

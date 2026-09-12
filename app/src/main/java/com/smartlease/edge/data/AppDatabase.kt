@@ -13,9 +13,10 @@ import androidx.room.RoomDatabase
         AreaEntity::class,
         RentalAgreementEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
+@androidx.room.TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun inspectionDao(): InspectionDao
     abstract fun propertyDao(): PropertyDao
