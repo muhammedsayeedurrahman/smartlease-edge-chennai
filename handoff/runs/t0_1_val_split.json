@@ -1,0 +1,44 @@
+{
+  "A": {
+    "weights": "handoff/runs/A_yolov8n_640/weights/best.pt",
+    "imgsz": 640,
+    "split": "val",
+    "mask_map50": 0.1792,
+    "mask_map5095": 0.081,
+    "box_map50": 0.1967,
+    "per_class": {
+      "crack": 0.2565,
+      "peeling": 0.0458,
+      "spalling": 0.3728,
+      "damp_stain": 0.0418
+    }
+  },
+  "B": {
+    "weights": "handoff/runs/B_yolo11n_640/weights/best.pt",
+    "imgsz": 640,
+    "split": "val",
+    "mask_map50": 0.2045,
+    "mask_map5095": 0.0904,
+    "box_map50": 0.2229,
+    "per_class": {
+      "crack": 0.2735,
+      "peeling": 0.0448,
+      "spalling": 0.4083,
+      "damp_stain": 0.0912
+    }
+  },
+  "C": {
+    "weights": "handoff/runs/C_yolov8n_800/weights/best.pt",
+    "imgsz": 800,
+    "split": "val",
+    "mask_map50": 0.1675,
+    "mask_map5095": 0.0776,
+    "box_map50": 0.1893,
+    "per_class": {
+      "crack": 0.2237,
+      "peeling": 0.0163,
+      "spalling": 0.3732,
+      "damp_stain": 0.0569
+    }
+  }
+}

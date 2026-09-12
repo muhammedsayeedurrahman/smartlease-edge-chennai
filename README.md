@@ -136,18 +136,21 @@ workspace root for the full ledger, and `METRICS.md` for the first recorded visi
 
 ### ⚠️ Known weaknesses we will raise before a judge does
 
-- **Vision mAP50 (mask) is 0.249**, and the number went *down* on purpose. The previous
+- **Vision mAP50 (mask) is 0.2145**, and the number went *down* on purpose. The previous
   0.659 was measured on a split whose test set was 81% leaked into training — a memorisation
-  score, not an accuracy. The shipping model is retrained on a regrouped, leak-free rebuild
-  (`ml/vision/handoff/docs/DATASET.md`), so 0.249 is the first vision number here that means
-  anything. Per class: spalling 0.617, peeling 0.222, damp_stain 0.105, **crack 0.052**.
-- **Crack detection is the weak class and we will say so first.** At AP50 0.052 the model
-  finds almost no cracks. It is not the capability to demo.
-- **False positives on clean surfaces are now measured, and were the reason to retrain.** The
-  old model flagged a defect on **100%** of clean test images. The shipping model flags 28.6%
-  at the detection threshold it actually runs at (0.55), which is why that threshold is 0.55
-  and not the Ultralytics default. Sample size is only 14 clean images —
-  `docs/guides/SHOOT_LIST.md` is the 360-image shoot that would let us state this properly.
+  score, not an accuracy. The shipping model is retrained on a leak-free rebuild, and 0.2145
+  is the pooled val+test estimate over all 686 held-out images (`handoff/METRICS_MODELS.md`),
+  which is the most reliable point estimate available. The 268-image test split alone reads
+  0.2488; quote the pooled figure.
+- **Per-class accuracy is not quotable from our test split.** It holds only 46 crack
+  instances, which is too few to read an AP from. We know crack is the weak class and we say
+  so; we do not attach a decimal to it.
+- **False positives on clean surfaces are measured on 63 held-out backgrounds.** At the
+  threshold the app ships (0.45) it leaves 39.7% of clean images completely alone, against
+  19.0% at the Ultralytics-default 0.25 — bought for 0.7 of a point of recall. The model
+  previously on the phone left **3.2%** alone. Caveat we state before anyone asks: those 63
+  negatives are drone photographs of building exteriors, not flat interiors.
+  `docs/guides/SHOOT_LIST.md` is the indoor shoot that would let us state this properly.
 - **The acoustic model is trained on 15 taps from 8 recordings.** 80% grouped-LOGO accuracy,
   **95% CI 55–93%**, against a **53.3%** majority baseline — so the bottom of the interval is
   chance, and the model is not yet distinguishable from guessing at the low end. The app

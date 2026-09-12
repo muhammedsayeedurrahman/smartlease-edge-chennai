@@ -1,0 +1,14 @@
+{
+  "verdict": "FAIL",
+  "failures": [
+    "UNREADABLE  ..\\..\\..\\AppData\\Local\\Temp\\claude\\C--Users-shj08-Downloads-project-1-IQOO-Hackathon\\da933b84-2af8-489a-9464-25904af7a3ce\\scratchpad\\pilot_heic\\clean\\painted_wall\\IMG_9001.jpg - HEIC/HEIF - OpenCV and PIL cannot read it. Set the camera to JPEG / 'Most compatible' and reshoot."
+  ],
+  "warnings": [
+    "COVERAGE only 1 clean surface folder(s); send >=3 different surfaces so the split and the group logic are actually exercised"
+  ],
+  "clean_groups": {
+    "painted_wall": 1
+  },
+  "defect_classes": {},
+  "images": []
+}

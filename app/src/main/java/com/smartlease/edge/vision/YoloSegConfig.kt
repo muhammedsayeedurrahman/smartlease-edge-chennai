@@ -74,26 +74,41 @@ object YoloSegConfig {
     /**
      * Below this class score a detection is discarded before NMS.
      *
-     * Raised from 0.25 to 0.55 on measurement, not taste. The false-positive sweep over the
-     * 14 clean-surface images in the `unified_v2` test split (handoff/benchmarks/eval_A.json,
-     * `clean_fp`) reads:
+     * **0.45, set from the measured exchange rate rather than from either side of it alone.**
+     *
+     * A threshold buys specificity by spending recall, so it cannot be chosen from a
+     * false-positive table alone. Specificity is measured on 63 held-out backgrounds
+     * (`handoff/runs/t0_1_clean_fp_63.json`); recall on the 268-image test split. Both for
+     * the shipping weights:
      *
      * ```
-     * threshold   clean images flagged   false positives / image
-     *   0.25              78.6%                   1.64
-     *   0.35              64.3%                   1.21
-     *   0.45              50.0%                   0.79
-     *   0.55              28.6%                   0.43
+     * conf   clean images left alone   FP / clean image   mask recall   mask precision
+     * 0.25            19.0%                 3.79             0.247          0.421
+     * 0.45            39.7%                 1.87             0.240          0.442   <- here
+     * 0.55            47.6%                 1.41             0.223          0.516
+     * 0.65            52.4%                 1.03             0.182          0.573
+     * 0.80            74.6%                 0.27             0.081          0.649
      * ```
      *
-     * A tenant-facing report that invents a defect is worse than one that misses a faint
-     * one: the first loses the argument, the second merely fails to win it. 0.55 is the
-     * cheapest available cut in the invented-defect rate.
+     * Read the 0.25 -> 0.45 row transition: specificity doubles and false positives per clean
+     * image halve, for **0.7 of a percentage point** of recall. Almost no true detections
+     * score in that band and a great many false ones do. Past 0.55 the trade inverts, and by
+     * 0.80 recall is 0.081 — an inspection tool that finds one defect in twelve, which is not
+     * a tool. 0.45 is the knee.
      *
-     * Known limit: 14 background images is too small a sample to pin this number precisely.
-     * docs/SHOOT_LIST.md is the 360-image shoot that would let it be set honestly.
+     * Two honest limits. **First**, all 63 negatives are drone photographs of building
+     * exteriors, and this app is pointed at the inside of a rented flat; the shape of the
+     * curve should transfer but the magnitudes may not. `docs/guides/SHOOT_LIST.md` is the
+     * indoor shoot that would settle it, and this number should be re-derived once it exists.
+     * **Second**, an earlier revision set 0.55 from the 14-image `clean_fp` table in
+     * eval_A.json — too small a sample to carry the claim. The 63-image measurement and the
+     * recall sweep above supersede it.
+     *
+     * Nothing here removes the downstream mitigation: DeductionEngine still refuses to price
+     * below `PRICING_CONFIDENCE_FLOOR`, so a detection scoring between this cut and that floor
+     * reaches the tenant as "listed for human review, not priced" rather than as a charge.
      */
-    const val SCORE_THRESHOLD = 0.55f
+    const val SCORE_THRESHOLD = 0.45f
 
     /** IoU above which the lower-scoring of two same-class boxes is suppressed. */
     const val NMS_IOU_THRESHOLD = 0.45f

@@ -1,0 +1,28 @@
+{
+  "torch": "2.12.1+cpu",
+  "workspace_has_space": true,
+  "N_known_good": 8,
+  "known_good_bytes": 13773650,
+  "native_version_torch2x": 8,
+  "backport_needed": false,
+  "backported_version": 8,
+  "version_matches_N": true,
+  "forward_ok": true,
+  "forward_is_tuple": true,
+  "forward_out_shapes": [
+    [
+      1,
+      4,
+      256
+    ],
+    [
+      1,
+      4,
+      16,
+      16
+    ]
+  ],
+  "verdict_under_torch2x": "PASS",
+  "artifact_for_1131_check": "C:\\Users\\shj08\\AppData\\Local\\Temp\\slx_p0\\toy_backported.ptl",
+  "note": "Loading under torch 2.x proves well-formedness, not 1.13.0 acceptance. Run p0_1_verify_on_1131.py in the export/ venv for the real proxy."
+}

@@ -1,0 +1,75 @@
+{
+  "tag": "INCUMBENT",
+  "weights": "YOLOV8/best.pt",
+  "imgsz": 640,
+  "mask_map50": 0.6585148647580739,
+  "mask_map5095": 0.3912114769530078,
+  "box_map50": 0.7641851960274553,
+  "per_class": {
+    "crack": {
+      "mask_ap50": 0.3686693569324112,
+      "mask_ap5095": 0.13311279602490508,
+      "mask_p": 0.609633139107125,
+      "mask_r": 0.391304347826087
+    },
+    "peeling": {
+      "mask_ap50": 0.7234573794024659,
+      "mask_ap5095": 0.4190046663550061,
+      "mask_p": 0.7744292674979867,
+      "mask_r": 0.7007874015748031
+    },
+    "spalling": {
+      "mask_ap50": 0.8725476383850763,
+      "mask_ap5095": 0.6242052799649233,
+      "mask_p": 0.9085937852456218,
+      "mask_r": 0.7894756381041623
+    },
+    "stain_mould": {
+      "mask_ap50": 0.669385084312342,
+      "mask_ap5095": 0.3885231654671968,
+      "mask_p": 0.6923786228283125,
+      "mask_r": 0.6265060240963856
+    }
+  },
+  "n_background_images": 14,
+  "clean_fp": {
+    "0.25": {
+      "fp_per_image": 1.7857142857142858,
+      "pct_images_flagged": 100.0,
+      "per_class": {
+        "stain_mould": 16,
+        "spalling": 4,
+        "peeling": 3,
+        "crack": 2
+      }
+    },
+    "0.35": {
+      "fp_per_image": 1.1428571428571428,
+      "pct_images_flagged": 78.57142857142857,
+      "per_class": {
+        "spalling": 3,
+        "stain_mould": 9,
+        "peeling": 3,
+        "crack": 1
+      }
+    },
+    "0.45": {
+      "fp_per_image": 1.0,
+      "pct_images_flagged": 71.42857142857143,
+      "per_class": {
+        "spalling": 3,
+        "stain_mould": 8,
+        "peeling": 3
+      }
+    },
+    "0.55": {
+      "fp_per_image": 0.7857142857142857,
+      "pct_images_flagged": 50.0,
+      "per_class": {
+        "spalling": 2,
+        "stain_mould": 6,
+        "peeling": 3
+      }
+    }
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "tag": "A",
+  "weights": "handoff/runs/A_yolov8n_640/weights/best.pt",
+  "imgsz": 640,
+  "mask_map50": 0.24884479032542384,
+  "mask_map5095": 0.1495690756563186,
+  "box_map50": 0.28715170411596525,
+  "per_class": {
+    "crack": {
+      "mask_ap50": 0.05162802883632926,
+      "mask_ap5095": 0.01665509969432429,
+      "mask_p": 0.09214933895281872,
+      "mask_r": 0.08695652173913043
+    },
+    "peeling": {
+      "mask_ap50": 0.2220988897850037,
+      "mask_ap5095": 0.13667032932740614,
+      "mask_p": 0.4531277739823523,
+      "mask_r": 0.2283464566929134
+    },
+    "spalling": {
+      "mask_ap50": 0.6169545826761349,
+      "mask_ap5095": 0.3914513916901208,
+      "mask_p": 0.7500412022103451,
+      "mask_r": 0.5776173285198556
+    },
+    "damp_stain": {
+      "mask_ap50": 0.10469766000422748,
+      "mask_ap5095": 0.05349948191342321,
+      "mask_p": 0.38765508164500373,
+      "mask_r": 0.0963855421686747
+    }
+  },
+  "n_background_images": 14,
+  "clean_fp": {
+    "0.25": {
+      "fp_per_image": 1.6428571428571428,
+      "pct_images_flagged": 78.57142857142857,
+      "per_class": {
+        "crack": 9,
+        "spalling": 4,
+        "peeling": 7,
+        "damp_stain": 3
+      }
+    },
+    "0.35": {
+      "fp_per_image": 1.2142857142857142,
+      "pct_images_flagged": 64.28571428571429,
+      "per_class": {
+        "crack": 4,
+        "spalling": 4,
+        "peeling": 6,
+        "damp_stain": 3
+      }
+    },
+    "0.45": {
+      "fp_per_image": 0.7857142857142857,
+      "pct_images_flagged": 50.0,
+      "per_class": {
+        "crack": 2,
+        "spalling": 2,
+        "peeling": 5,
+        "damp_stain": 2
+      }
+    },
+    "0.55": {
+      "fp_per_image": 0.42857142857142855,
+      "pct_images_flagged": 28.571428571428573,
+      "per_class": {
+        "spalling": 1,
+        "peeling": 4,
+        "damp_stain": 1
+      }
+    }
+  }
+}

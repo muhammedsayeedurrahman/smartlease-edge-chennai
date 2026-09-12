@@ -1,0 +1,22 @@
+{
+  "weights": "handoff/runs/A_yolov8n_640/weights/best.pt",
+  "imgsz": 640,
+  "torch": "2.11.0+cu128",
+  "nc": 4,
+  "bytecode_emitted": 8,
+  "bytecode_final": 8,
+  "lite_preds": [
+    1,
+    40,
+    8400
+  ],
+  "lite_protos": [
+    1,
+    32,
+    160,
+    160
+  ],
+  "max_abs_diff_eager_vs_lite": 0.0,
+  "output": "C:\\Users\\shj08\\Downloads\\project-1\\IQOO Hackathon\\handoff\\models\\vision\\yolov8n_seg.ptl",
+  "bytes": 13735730
+}

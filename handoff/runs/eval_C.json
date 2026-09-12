@@ -1,0 +1,75 @@
+{
+  "tag": "C",
+  "weights": "handoff/runs/C_yolov8n_800/weights/best.pt",
+  "imgsz": 800,
+  "mask_map50": 0.29283010694586464,
+  "mask_map5095": 0.1645801678845682,
+  "box_map50": 0.3088941893772955,
+  "per_class": {
+    "crack": {
+      "mask_ap50": 0.16832392709268715,
+      "mask_ap5095": 0.05680696956570741,
+      "mask_p": 0.14291014447283876,
+      "mask_r": 0.2826086956521739
+    },
+    "peeling": {
+      "mask_ap50": 0.2512482831250922,
+      "mask_ap5095": 0.1478341989063015,
+      "mask_p": 0.3548101317223147,
+      "mask_r": 0.28346456692913385
+    },
+    "spalling": {
+      "mask_ap50": 0.6794803553876613,
+      "mask_ap5095": 0.42362289005019776,
+      "mask_p": 0.6999132287554108,
+      "mask_r": 0.6230914043143856
+    },
+    "damp_stain": {
+      "mask_ap50": 0.07226786217801795,
+      "mask_ap5095": 0.030056613016066075,
+      "mask_p": 0.1154793617255911,
+      "mask_r": 0.07228915662650602
+    }
+  },
+  "n_background_images": 14,
+  "clean_fp": {
+    "0.25": {
+      "fp_per_image": 2.0714285714285716,
+      "pct_images_flagged": 78.57142857142857,
+      "per_class": {
+        "crack": 13,
+        "spalling": 6,
+        "peeling": 3,
+        "damp_stain": 7
+      }
+    },
+    "0.35": {
+      "fp_per_image": 1.0,
+      "pct_images_flagged": 64.28571428571429,
+      "per_class": {
+        "crack": 2,
+        "spalling": 3,
+        "peeling": 3,
+        "damp_stain": 6
+      }
+    },
+    "0.45": {
+      "fp_per_image": 0.7142857142857143,
+      "pct_images_flagged": 42.857142857142854,
+      "per_class": {
+        "spalling": 3,
+        "peeling": 3,
+        "damp_stain": 4
+      }
+    },
+    "0.55": {
+      "fp_per_image": 0.6428571428571429,
+      "pct_images_flagged": 35.714285714285715,
+      "per_class": {
+        "spalling": 2,
+        "peeling": 3,
+        "damp_stain": 4
+      }
+    }
+  }
+}

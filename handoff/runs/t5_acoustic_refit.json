@@ -1,0 +1,57 @@
+{
+  "verdict": "LEAD",
+  "best_model": "logreg (incumbent)",
+  "baseline": 0.5,
+  "n_taps": 280,
+  "n_recordings": 56,
+  "n_specimens": 50,
+  "n_pairs": 6,
+  "n_built": 6,
+  "hollow_spots": 28,
+  "solid_spots": 28,
+  "drop_legacy": false,
+  "results": {
+    "logreg (incumbent)": {
+      "tap_acc": 1.0,
+      "tap_n": 280,
+      "tap_ci95": [
+        0.9864656907232767,
+        1.0000000000000002
+      ],
+      "spot_acc": 1.0,
+      "spot_n": 50,
+      "spot_ci95": [
+        0.9286499658256813,
+        1.0
+      ]
+    },
+    "gradient boosting": {
+      "tap_acc": 1.0,
+      "tap_n": 280,
+      "tap_ci95": [
+        0.9864656907232767,
+        1.0000000000000002
+      ],
+      "spot_acc": 1.0,
+      "spot_n": 50,
+      "spot_ci95": [
+        0.9286499658256813,
+        1.0
+      ]
+    },
+    "mlp 32x16": {
+      "tap_acc": 1.0,
+      "tap_n": 280,
+      "tap_ci95": [
+        0.9864656907232767,
+        1.0000000000000002
+      ],
+      "spot_acc": 1.0,
+      "spot_n": 50,
+      "spot_ci95": [
+        0.9286499658256813,
+        1.0
+      ]
+    }
+  }
+}

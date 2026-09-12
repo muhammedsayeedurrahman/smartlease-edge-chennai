@@ -1,0 +1,77 @@
+{
+  "tag": "B",
+  "weights": "handoff/runs/B_yolo11n_640/weights/best.pt",
+  "imgsz": 640,
+  "mask_map50": 0.2976629114321276,
+  "mask_map5095": 0.16781145958584265,
+  "box_map50": 0.34121747760267884,
+  "per_class": {
+    "crack": {
+      "mask_ap50": 0.0494031439429045,
+      "mask_ap5095": 0.019050828090373454,
+      "mask_p": 0.11474879694382457,
+      "mask_r": 0.1956521739130435
+    },
+    "peeling": {
+      "mask_ap50": 0.2798282760289399,
+      "mask_ap5095": 0.1640006151419533,
+      "mask_p": 0.3685554338805099,
+      "mask_r": 0.25984251968503935
+    },
+    "spalling": {
+      "mask_ap50": 0.6420020917902505,
+      "mask_ap5095": 0.38900870913792973,
+      "mask_p": 0.6741952798132687,
+      "mask_r": 0.5976421260986329
+    },
+    "damp_stain": {
+      "mask_ap50": 0.21941813396641535,
+      "mask_ap5095": 0.09918568597311406,
+      "mask_p": 0.4283264594286926,
+      "mask_r": 0.2891566265060241
+    }
+  },
+  "n_background_images": 14,
+  "clean_fp": {
+    "0.25": {
+      "fp_per_image": 1.5,
+      "pct_images_flagged": 78.57142857142857,
+      "per_class": {
+        "crack": 8,
+        "spalling": 3,
+        "damp_stain": 6,
+        "peeling": 4
+      }
+    },
+    "0.35": {
+      "fp_per_image": 1.0,
+      "pct_images_flagged": 57.142857142857146,
+      "per_class": {
+        "crack": 4,
+        "spalling": 2,
+        "damp_stain": 4,
+        "peeling": 4
+      }
+    },
+    "0.45": {
+      "fp_per_image": 0.9285714285714286,
+      "pct_images_flagged": 57.142857142857146,
+      "per_class": {
+        "crack": 4,
+        "spalling": 2,
+        "damp_stain": 4,
+        "peeling": 3
+      }
+    },
+    "0.55": {
+      "fp_per_image": 0.7142857142857143,
+      "pct_images_flagged": 57.142857142857146,
+      "per_class": {
+        "crack": 2,
+        "spalling": 2,
+        "damp_stain": 4,
+        "peeling": 2
+      }
+    }
+  }
+}

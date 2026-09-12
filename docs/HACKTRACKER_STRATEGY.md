@@ -98,7 +98,7 @@ Every row below is an activity the product **actually requires**. None is invent
 |---|---|---|---|---|---|---|---|
 | 1 | Move-in baseline capture, room by room | The entire thesis is *comparison between two moments*. Without a baseline there is no product | Rear camera, ISP, storage | Camera session count + duration [strongly inferred] | End Product 30, Phone Use 15 | **High** — it is the opening beat of the demo | Establishes the paired-capture data model |
 | 2 | Viewpoint re-alignment at move-out | A change claim is worthless if the two photos were taken from different places | Accelerometer + magnetometer via rotation vector (`ArAlignmentTracker.kt`) | Sensor registration [speculative]; camera duration [strongly inferred] | Technical Depth 15, Novelty 20 | **High** — visibly non-trivial | Genuine original engineering; no ARCore involved |
-| 3 | On-device defect segmentation | The detection step. Runs with no network permission at all | CPU via PyTorch Mobile Lite | App foreground time [strongly inferred]; inference itself [speculative] | End Product 30, Technical Depth 15 | Medium — model is weak (§10) | Real, but be honest about mAP50 0.249 |
+| 3 | On-device defect segmentation | The detection step. Runs with no network permission at all | CPU via PyTorch Mobile Lite | App foreground time [strongly inferred]; inference itself [speculative] | End Product 30, Technical Depth 15 | Medium — model is weak (§10) | Real, but be honest about mAP50 0.2145 |
 | 4 | Acoustic knuckle-tap verification | Vision cannot tell a hairline crack from a hollow debonded tile. Sound can | Microphone, 16 kHz capture | Audio session count + duration [strongly inferred] | **Novelty 20**, Phone Use 15 | **Very high** — nobody else will do this | Real, trained, wired. Small sample — say so |
 | 5 | OCR of the lease / meter readings | Deposit amount and meter values enter the record without typing | Camera + ML Kit on-device text recognition | Camera duration; app time | End Product 30 | Medium | On-device by default — supports the offline claim |
 | 6 | IR appliance functional check | **The differentiator.** Every competitor documents how a flat *looks*. You test whether the AC *works* | **IR emitter** (`ConsumerIrManager`, 38 kHz) | Likely none [speculative] | **Novelty 20**, Phone Use 15, Demo 10 | **Highest in the deck** | Hardware confirmed present on iQOO 15 (2-0) |
@@ -293,7 +293,7 @@ Five components, none of which is a model:
 
 | Suite | Metric | Status today | Action |
 |---|---|---|---|
-| **Vision** | Box mAP50, mask mAP50, mask mAP50-95, per-class AP50, clean-surface false-positive rate | **MEASURED, RETRAINED** — 0.287 / **0.249** / 0.150 on a leak-free 268-image test split; spalling 0.617, peeling 0.222, damp_stain 0.105, **crack 0.052**; clean images falsely flagged 28.6% at the shipping threshold 0.55; `ml/vision/handoff/benchmarks/eval_A.json` [VERIFIED] | Quote as-is. Do not round upward. **Keep crack out of the demo path — spalling is the class that works.** Volunteer the leakage story before it is asked |
+| **Vision** | mask mAP50 (pooled), clean-surface specificity | **MEASURED, RETRAINED** — mask mAP50 **0.2145** pooled over 686 held-out images; specificity 39.7% on 63 backgrounds at the shipping threshold 0.45, against 3.2% for the replaced model; `handoff/METRICS_MODELS.md` [VERIFIED] | Quote the pooled figure, not the 268-image test split's 0.2488. **Do not quote per-class AP — 46 crack instances cannot carry one.** Keep crack out of the demo path; spalling is the class that works. Volunteer the leakage story before it is asked |
 | **Baseline comparison** | False-change rate, missed-change rate, robustness to viewpoint / lighting / distance | **NOT MEASURED** | Say "not measured". Do not estimate |
 | **Acoustic** | Accuracy, CI, baseline | **MEASURED** — LeaveOneGroupOut 0.867, **95% CI [0.621, 0.963]**, majority baseline 0.533, **n = 15 taps from 8 recordings** [VERIFIED] | **Never quote 0.867 without the interval and the n.** The interval is the credibility |
 | **Acoustic** | Confusion matrix, background-noise robustness | **NOT MEASURED** | Say so. Venue noise is a fair challenge — answer it with the design (knuckle tap is a loud transient close to the mic), not with a number you don't have |
@@ -453,7 +453,7 @@ Every answer below is grounded in what is true in this repository **today**. Ans
 
 **Q5. "What happens if the AI is wrong?" ⚠**
 
-- **FACT — say this first.** It **is** wrong, often. Mask mAP50 0.249 across four classes, and crack AP50 is 0.052 — it finds almost no cracks. Spalling, at 0.617, is the one class worth pointing a phone at.
+- **FACT — say this first.** It **is** wrong, often. Mask mAP50 0.2145 across four classes. Crack is the weak class and spalling is the one worth pointing a phone at — said qualitatively, because our test split has 46 crack instances and cannot support a per-class decimal.
 - **TECHNICAL.** Which is exactly why `DeductionEngine.PRICING_CONFIDENCE_FLOOR` is 0.60 and why anything below it, or anything the heuristic flagged, is reported as requiring human review rather than priced. What we assert is the measurement and the signed record — not an infallible detector. The confidence floor is **printed on the report itself**, so the limitation travels with the document instead of living in a slide.
 - **DEMO.** `ml/YOLOV8/val_metrics.json`, then the honesty note at the bottom of the generated PDF.
 
@@ -651,7 +651,7 @@ Contribution ratings are **[INFERENCE]** from the published weights. There is no
   │                                                                           │
   │  CAMERA ──────► CameraX 1.4.1 ──┬──► YOLOv8n-Seg (.ptl, 13.8 MB)          │
   │                                 │      PyTorch Mobile Lite → CPU          │
-  │                                 │      mask mAP50 0.249 · crack AP50 0.05 │
+  │                                 │      mask mAP50 0.2145 (pooled, n=686)  │
   │                                 │                                         │
   │                                 └──► ML Kit OCR (on-device)               │
   │                                        lease terms · meter readings       │
@@ -747,7 +747,7 @@ A later proposal in the same session floated replacing the current single-shot c
 
 I would stop trying to be impressive and start being **unfalsifiable**.
 
-Here is the actual competitive situation, without flattery. Your model is weak — mask mAP50 0.249, and a crack detector at AP50 0.052 is not a crack detector. Your acoustic result rests on fifteen taps. You have no LLM, no NPU path, and no depth sensing, and three of your loudest slide claims are false in code as of this morning. If you walk in and pitch SmartLease Edge as an AI product, a judge with an ML background will take it apart in two questions, and you will deserve it.
+Here is the actual competitive situation, without flattery. Your model is weak — mask mAP50 0.2145, and crack is the class it handles worst. Your acoustic result rests on fifteen taps. You have no LLM, no NPU path, and no depth sensing, and three of your loudest slide claims are false in code as of this morning. If you walk in and pitch SmartLease Edge as an AI product, a judge with an ML background will take it apart in two questions, and you will deserve it.
 
 But that is not the product you have. The product you have is something rarer, and I do not think you have noticed how rare.
 
@@ -757,7 +757,7 @@ But that is not the product you have. The product you have is something rarer, a
 
 So here is what I would do with the remaining hours.
 
-**I would make honesty the weapon, not the apology.** Open the technical Q&A with the bad number before anyone asks for it: *"Our detector gets mask mAP50 0.25 — and it used to say 0.66, until we hashed our own images and found 81% of the test set had leaked into training. That is not good enough to bill someone's deposit on. That is why the engine refuses to price anything below sixty percent confidence, and why that floor is printed on the report."* Watch what happens to the room. Judges spend all day being pitched at by people inflating, and the first team that hands them a real number and a real design response to it becomes the team they remember. If the research log's stack-ranking inference holds here — and it is an inference, not a rule — then being *memorable to several judges* beats being uniformly adequate, and nothing is more memorable at a hackathon than candour.
+**I would make honesty the weapon, not the apology.** Open the technical Q&A with the bad number before anyone asks for it: *"Our detector gets mask mAP50 0.21 — and it used to say 0.66, until we hashed our own images and found 81% of the test set had leaked into training. That is not good enough to bill someone's deposit on. That is why the engine refuses to price anything below sixty percent confidence, and why that floor is printed on the report."* Watch what happens to the room. Judges spend all day being pitched at by people inflating, and the first team that hands them a real number and a real design response to it becomes the team they remember. If the research log's stack-ranking inference holds here — and it is an inference, not a rule — then being *memorable to several judges* beats being uniformly adequate, and nothing is more memorable at a hackathon than candour.
 
 **I would build the entire demo around one image nobody else can produce:** a phone in airplane mode telling you the air conditioner works. Not a photo of an AC. Not a classification of an AC. A 38 kHz command leaving the emitter, the unit responding, the finding landing in the report, with a rupee figure at the end. Every competitor documents how a flat looks. You are the only team that tests whether anything in it functions. That is thirty seconds of demo and it is worth more than every remaining line of code you could write today.
 

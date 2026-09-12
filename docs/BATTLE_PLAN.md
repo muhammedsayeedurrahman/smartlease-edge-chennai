@@ -12,7 +12,7 @@ Three things are true at once, and the plan follows from holding all three.
 
 **You have a genuinely strong premise.** Four different sensors — camera, microphone, IR emitter, OCR — feeding one signed artifact, entirely offline, with no `INTERNET` permission in the manifest. Most teams at a phone-first hackathon will ship a cloud API with a mobile front end. You are the opposite of that, and it is verifiable rather than claimed.
 
-**Your headline model is weak, and the honest number is lower than the one you used to quote.** The shipping model is mask mAP50 **0.249** across four classes, with **crack at AP50 0.052** — it finds almost no cracks. The older 0.267/0.659 figures were measured on a split with 81% test-set leakage, so they were memorisation scores. Spalling (0.617) is the only class that genuinely works. Source: `ml/vision/handoff/benchmarks/eval_A.json`.
+**Your headline model is weak, and the honest number is lower than the one you used to quote.** The shipping model is mask mAP50 **0.2145**, pooled over all 686 held-out images. The older 0.267/0.659 figures came from a split with 81% test-set leakage, so they were memorisation scores. Crack is the weak class — but do not attach a decimal to it: the test split holds only 46 crack instances and cannot carry a per-class AP. Source: `handoff/METRICS_MODELS.md`.
 
 **Several of your loudest claims are currently false in code.** The Hexagon NPU path, GenieX/Llama 3.2 3B, SHA-256, the rupee deduction, dual signatures, ARCore depth. Two of those are being fixed today; the rest cannot be built inside the window.
 
@@ -69,7 +69,7 @@ Strictly ordered. Do not start an item before everything above it is done.
 
 Judges reward candour and punish polished-deck-thin-code; this is the most consistent finding across every judging source reviewed. You have unusually good material for this.
 
-Say plainly: *"Our detector gets mask mAP50 0.25 across four classes on mixed public data, and crack detection is close to useless at 0.05. That is not good enough to bill someone's deposit on, so the engine refuses to price anything below 60% confidence or anything the colour heuristic flagged — those go to human review. We also retrained after finding 81% of our own test set had leaked into training, which took the headline number down from 0.66 to 0.25. What we assert is the measurement and the signed record, not an infallible detector."*
+Say plainly: *"Our detector gets mask mAP50 0.21 across four classes on mixed public data. That is not good enough to bill someone's deposit on, so the engine refuses to price anything below 60% confidence or anything the colour heuristic flagged — those go to human review. We retrained after hashing our own images and finding 81% of the test set had leaked into training, which took the headline number down from 0.66 to 0.21. What we assert is the measurement and the signed record, not an infallible detector."*
 
 That answer converts your weakest number into evidence of engineering judgement. `DeductionEngine.PRICING_CONFIDENCE_FLOOR` exists in code precisely so this answer is demonstrable rather than rhetorical.
 
@@ -91,7 +91,7 @@ Reach the demo by 40 seconds. Every source reviewed agrees that the demo, not th
 
 | Question | Answer |
 |---|---|
-| What is your accuracy? | Mask mAP50 **0.249** across four classes on a leak-free 268-image test split — spalling 0.617, peeling 0.222, damp_stain 0.105, crack 0.052; `ml/vision/handoff/benchmarks/eval_A.json`. Which is why the pricing engine refuses low-confidence detections and the detection threshold sits at 0.55. |
+| What is your accuracy? | Mask mAP50 **0.2145**, pooled across all 686 held-out images; `handoff/METRICS_MODELS.md`. Per-class AP is not quotable — the test split holds 46 crack instances. On 63 held-out clean images the model leaves 39.7% completely alone at our 0.45 threshold, against 3.2% for the model we replaced. Which is why the pricing engine refuses low-confidence detections. |
 | Is this a legal document? | It is a tamper-evident record both parties can verify by recomputing the digest. Not a digital signature — no keypair, so it proves integrity, not authorship. |
 | Why not just use ChatGPT and a photo? | It needs network, it uploads a tenant's home to a third party, and it cannot tell you whether the AC works. |
 | Does it run on the NPU? | Today the segmenter runs through PyTorch Lite on CPU. The QNN bundle is exported and in the repo; wiring the Hexagon delegate is the next step, not a claim we are making now. |

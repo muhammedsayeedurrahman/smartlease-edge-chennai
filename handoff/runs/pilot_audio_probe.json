@@ -1,0 +1,263 @@
+{
+  "hollow_pilot_h8_tile_on_battens.wav": {
+    "riff": {
+      "container": "RIFF/WAVE",
+      "is_wave": true,
+      "fmt_tag": 1,
+      "channels": 1,
+      "rate": 44100,
+      "bits": 16,
+      "byte_rate": 88200,
+      "block_align": 2,
+      "data_bytes": 705600
+    },
+    "decoded_rate": 44100,
+    "n_strikes": 2
+  },
+  "solid_pilot_s4_tile_flat.wav": {
+    "riff": {
+      "container": "RIFF/WAVE",
+      "is_wave": true,
+      "fmt_tag": 1,
+      "channels": 1,
+      "rate": 44100,
+      "bits": 16,
+      "byte_rate": 88200,
+      "block_align": 2,
+      "data_bytes": 705600
+    },
+    "decoded_rate": 44100,
+    "n_strikes": 5
+  },
+  "separability": {
+    "n_features_separating": 36,
+    "top": [
+      {
+        "feature": "high>=2k",
+        "hollow": 0.01086918544024229,
+        "solid": 0.24404442310333252,
+        "d": -166.71583557128906
+      },
+      {
+        "feature": "low<500",
+        "hollow": 0.7535463571548462,
+        "solid": 0.012545752339065075,
+        "d": 120.28545379638672
+      },
+      {
+        "feature": "mid500-2k",
+        "hollow": 0.23558449745178223,
+        "solid": 0.7434098124504089,
+        "d": -104.56868743896484
+      },
+      {
+        "feature": "mfcc11_mean",
+        "hollow": -58.95013427734375,
+        "solid": -1.3691339492797852,
+        "d": -65.63066864013672
+      },
+      {
+        "feature": "mfcc12_mean",
+        "hollow": -54.68462371826172,
+        "solid": -1.4341078996658325,
+        "d": -61.36652755737305
+      },
+      {
+        "feature": "mfcc5_mean",
+        "hollow": -14.367223739624023,
+        "solid": 12.668981552124023,
+        "d": -53.17267990112305
+      },
+      {
+        "feature": "mfcc1_mean",
+        "hollow": 92.52311706542969,
+        "solid": 27.941320419311523,
+        "d": 49.2596321105957
+      },
+      {
+        "feature": "mfcc6_mean",
+        "hollow": -10.565940856933594,
+        "solid": 9.246634483337402,
+        "d": -33.16577911376953
+      }
+    ]
+  },
+  "verdict": "FAIL",
+  "checks": [
+    {
+      "status": "PASS",
+      "check": "container / codec",
+      "detail": "RIFF/WAVE, fmt 1 = PCM (uncompressed)"
+    },
+    {
+      "status": "PASS",
+      "check": "sample rate",
+      "detail": "44100 Hz (want 44100)"
+    },
+    {
+      "status": "PASS",
+      "check": "channels",
+      "detail": "1 (want 1)"
+    },
+    {
+      "status": "PASS",
+      "check": "bit depth",
+      "detail": "16-bit (want 16)"
+    },
+    {
+      "status": "PASS",
+      "check": "duration",
+      "detail": "8.00 s (expect ~8)"
+    },
+    {
+      "status": "PASS",
+      "check": "clipping",
+      "detail": "0 samples at full scale"
+    },
+    {
+      "status": "PASS",
+      "check": "DC offset",
+      "detail": "0.00004 of full scale"
+    },
+    {
+      "status": "PASS",
+      "check": "energy above 8 kHz",
+      "detail": "3.5043% of total (-14.6 dB below full band)"
+    },
+    {
+      "status": "PASS",
+      "check": "resampling brickwall",
+      "detail": "none detected (high end rolls off smoothly)"
+    },
+    {
+      "status": "WARN",
+      "check": "strikes detected",
+      "detail": "2  peaks [-0.1, -15.6] dBFS"
+    },
+    {
+      "status": "PASS",
+      "check": "gaps between strikes",
+      "detail": "min 3.20 s, max 3.20 s"
+    },
+    {
+      "status": "WARN",
+      "check": "strike level",
+      "detail": "-15.6 to -0.1 dBFS (want -30 .. -1.5)"
+    },
+    {
+      "status": "WARN",
+      "check": "strike consistency",
+      "detail": "15.5 dB spread across strikes"
+    },
+    {
+      "status": "WARN",
+      "check": "AGC (post-strike recovery)",
+      "detail": "floor rises 4.0 dB between 0.5 s and 1.5 s after a strike (median of 1)  <-- gain is recovering; the decay-time feature is corrupted"
+    },
+    {
+      "status": "FAIL",
+      "check": "AGC (long-term drift)",
+      "detail": "pre-first -37.0 dBFS, end -52.3 dBFS  -> 15.3 dB spread"
+    },
+    {
+      "status": "PASS",
+      "check": "room floor below 200 Hz",
+      "detail": "84.91% of silent-segment energy"
+    },
+    {
+      "status": "PASS",
+      "check": "musical noise in silence",
+      "detail": "p99.5/median = 31"
+    },
+    {
+      "status": "PASS",
+      "check": "container / codec",
+      "detail": "RIFF/WAVE, fmt 1 = PCM (uncompressed)"
+    },
+    {
+      "status": "PASS",
+      "check": "sample rate",
+      "detail": "44100 Hz (want 44100)"
+    },
+    {
+      "status": "PASS",
+      "check": "channels",
+      "detail": "1 (want 1)"
+    },
+    {
+      "status": "PASS",
+      "check": "bit depth",
+      "detail": "16-bit (want 16)"
+    },
+    {
+      "status": "PASS",
+      "check": "duration",
+      "detail": "8.00 s (expect ~8)"
+    },
+    {
+      "status": "PASS",
+      "check": "clipping",
+      "detail": "0 samples at full scale"
+    },
+    {
+      "status": "PASS",
+      "check": "DC offset",
+      "detail": "0.00034 of full scale"
+    },
+    {
+      "status": "PASS",
+      "check": "energy above 8 kHz",
+      "detail": "2.3926% of total (-16.2 dB below full band)"
+    },
+    {
+      "status": "PASS",
+      "check": "resampling brickwall",
+      "detail": "none detected (high end rolls off smoothly)"
+    },
+    {
+      "status": "PASS",
+      "check": "strikes detected",
+      "detail": "5  peaks [-0.1, -9.6, -10.5, -11.2, -12.4] dBFS"
+    },
+    {
+      "status": "PASS",
+      "check": "gaps between strikes",
+      "detail": "min 0.95 s, max 1.10 s"
+    },
+    {
+      "status": "WARN",
+      "check": "strike level",
+      "detail": "-12.4 to -0.1 dBFS (want -30 .. -1.5)"
+    },
+    {
+      "status": "WARN",
+      "check": "strike consistency",
+      "detail": "12.3 dB spread across strikes"
+    },
+    {
+      "status": "PASS",
+      "check": "AGC (post-strike recovery)",
+      "detail": "floor rises 2.5 dB between 0.5 s and 1.5 s after a strike (median of 4)"
+    },
+    {
+      "status": "FAIL",
+      "check": "AGC (long-term drift)",
+      "detail": "pre-first -36.3 dBFS, end -48.2 dBFS  -> 11.9 dB spread"
+    },
+    {
+      "status": "PASS",
+      "check": "room floor below 200 Hz",
+      "detail": "87.35% of silent-segment energy"
+    },
+    {
+      "status": "PASS",
+      "check": "musical noise in silence",
+      "detail": "p99.5/median = 29"
+    },
+    {
+      "status": "PASS",
+      "check": "hollow/solid separability",
+      "detail": "36 of 36 features separate at |d| > 1.0"
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "torch": "1.13.1+cpu",
+  "python": "3.10.20",
+  "checks": [
+    {
+      "path": "handoff/models/vision/yolov8n_seg.ptl",
+      "exists": true,
+      "bytes": 13735730,
+      "bytecode_version": 8,
+      "load_ok": true,
+      "forward_ok": true,
+      "is_tuple": true,
+      "out_shapes": [
+        [
+          1,
+          40,
+          8400
+        ],
+        [
+          1,
+          32,
+          160,
+          160
+        ]
+      ],
+      "verdict": "PASS"
+    }
+  ],
+  "overall": "PASS"
+}
