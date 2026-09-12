@@ -179,7 +179,7 @@ fun VideoCaptureScreen(
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(
-                        Icons.Default.Warning,
+                        Icons.Rounded.Warning,
                         contentDescription = "Camera unavailable",
                         tint = com.smartlease.edge.ui.theme.LampAmber,
                         modifier = Modifier.size(40.dp)
