@@ -12,6 +12,7 @@ val CarbonBlack = Color(0xFF080808)
 val GlassUnified = Color(0x26FFFFFF) // 15% white overlay for glass
 val SurfaceUnified = Color(0xFF151515) // Slightly elevated black for cards
 val BorderUnified = Color(0x4DFFFFFF) // 30% white for subtle borders
+val BackgroundUnified = CarbonBlack
 
 // Text Colors (Unified)
 val TextPrimaryUnified = Color(0xFFFFFFFF)

@@ -151,21 +151,31 @@ fun RoomConfigScreen(
             Text("Record Surfaces", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
             Spacer(modifier = Modifier.height(16.dp))
 
+            val topFrames = room.frames.filter { it.surfaceType == "Top" }
+            val bottomFrames = room.frames.filter { it.surfaceType == "Bottom" }
+            val sidesFrames = room.frames.filter { it.surfaceType == "Sides" }
+
             SurfaceRecordCard(
                 title = "Top Wall (Ceiling)",
                 isRecorded = room.topRecorded,
+                frameCount = topFrames.size,
+                defectCount = topFrames.sumOf { it.defects.size },
                 onClick = { onRecordSurface(room.id, "Top") }
             )
             Spacer(modifier = Modifier.height(12.dp))
             SurfaceRecordCard(
                 title = "Bottom Wall (Floor)",
                 isRecorded = room.bottomRecorded,
+                frameCount = bottomFrames.size,
+                defectCount = bottomFrames.sumOf { it.defects.size },
                 onClick = { onRecordSurface(room.id, "Bottom") }
             )
             Spacer(modifier = Modifier.height(12.dp))
             SurfaceRecordCard(
                 title = "Side Walls",
                 isRecorded = room.sidesRecorded,
+                frameCount = sidesFrames.size,
+                defectCount = sidesFrames.sumOf { it.defects.size },
                 onClick = { onRecordSurface(room.id, "Sides") }
             )
             
@@ -175,7 +185,13 @@ fun RoomConfigScreen(
 }
 
 @Composable
-fun SurfaceRecordCard(title: String, isRecorded: Boolean, onClick: () -> Unit) {
+fun SurfaceRecordCard(
+    title: String, 
+    isRecorded: Boolean, 
+    frameCount: Int = 0,
+    defectCount: Int = 0,
+    onClick: () -> Unit
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -196,9 +212,18 @@ fun SurfaceRecordCard(title: String, isRecorded: Boolean, onClick: () -> Unit) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
                 if (isRecorded) {
-                    Text("Recorded • Ready for AI Analysis", style = MaterialTheme.typography.bodySmall, color = com.smartlease.edge.ui.theme.LampGreen)
+                    val statusText = if (frameCount > 0) {
+                        "$frameCount frames converted • ${if (defectCount > 0) "$defectCount defect(s)" else "All clean"}"
+                    } else {
+                        "Recorded • Ready for AI Analysis"
+                    }
+                    Text(
+                        statusText, 
+                        style = MaterialTheme.typography.bodySmall, 
+                        color = if (defectCount > 0) com.smartlease.edge.ui.theme.LampAmber else com.smartlease.edge.ui.theme.LampGreen
+                    )
                 } else {
-                    Text("Tap to record video", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Tap to record video & convert frames", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             

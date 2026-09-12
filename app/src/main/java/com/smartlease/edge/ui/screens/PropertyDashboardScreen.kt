@@ -162,8 +162,16 @@ fun RoomListItem(room: Room, onClick: () -> Unit) {
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(room.type, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
-                if (room.sqFt.isNotEmpty()) {
-                    Text("${room.sqFt} sq ft", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                val details = buildList {
+                    if (room.sqFt.isNotEmpty()) add("${room.sqFt} sq ft")
+                    if (room.frames.isNotEmpty()) {
+                        add("${room.frames.size} frames")
+                        val totalDefects = room.frames.sumOf { it.defects.size }
+                        if (totalDefects > 0) add("$totalDefects defects")
+                    }
+                }.joinToString(" • ")
+                if (details.isNotEmpty()) {
+                    Text(details, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             
