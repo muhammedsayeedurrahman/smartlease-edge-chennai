@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.smartlease.edge.data.SessionType
 import com.smartlease.edge.ui.AppViewModel
 import com.smartlease.edge.ui.Room
 import java.util.UUID
@@ -35,10 +36,13 @@ fun PropertyDashboardScreen(
     viewModel: AppViewModel,
     propertyId: String,
     onBack: () -> Unit,
-    onRoomSelected: (String) -> Unit
+    onRoomSelected: (String) -> Unit,
+    onGenerateReport: (SessionType) -> Unit = {}
 ) {
     val property = viewModel.properties.find { it.id == propertyId }
     val rooms = viewModel.getRoomsForProperty(propertyId)
+    val capturedDefectCount = rooms.sumOf { room -> room.frames.sumOf { it.defects.size } }
+    var askingSessionType by remember { mutableStateOf(false) }
 
     val roomCategories = listOf(
         "Hall" to Icons.Rounded.Weekend,
@@ -108,13 +112,73 @@ fun PropertyDashboardScreen(
                     Text("No areas added yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                LazyColumn(
+                    modifier = Modifier.weight(1f, fill = false),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     items(rooms) { room ->
                         RoomListItem(room = room, onClick = { onRoomSelected(room.id) })
                     }
                 }
+
+                Spacer(modifier = Modifier.height(20.dp))
+                // Without this the capture flow had no exit: areas could be recorded
+                // indefinitely and nothing ever produced the report, PDF, digest, or
+                // countersignature the whole product exists to produce.
+                Button(
+                    onClick = { askingSessionType = true },
+                    enabled = capturedDefectCount > 0,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Generate report")
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    if (capturedDefectCount > 0) {
+                        "$capturedDefectCount finding(s) across ${rooms.size} area(s) will be " +
+                            "written up, priced against the deposit, and digest-stamped."
+                    } else {
+                        // Stating the actual precondition beats a disabled button with no
+                        // explanation -- and it must not imply the areas were inspected and
+                        // found clean, only that nothing has been detected yet.
+                        "Record an area first. A report is only produced once the camera has " +
+                            "flagged at least one defect -- nothing here is written up by hand."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(20.dp))
             }
         }
+    }
+
+    if (askingSessionType) {
+        // Asked, never guessed: the two answers price differently. A move-out report charges
+        // findings against the deposit; a move-in report records the same findings as the
+        // baseline the tenant is NOT responsible for. Defaulting silently would put a rupee
+        // figure on a document someone signs, derived from an assumption nobody made.
+        AlertDialog(
+            onDismissRequest = { askingSessionType = false },
+            title = { Text("Which inspection is this?") },
+            text = {
+                Text(
+                    "Move-in records the property's existing condition as the baseline. " +
+                        "Move-out prices what changed since then against the deposit."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    askingSessionType = false
+                    onGenerateReport(SessionType.MOVE_OUT)
+                }) { Text("Move-out") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    askingSessionType = false
+                    onGenerateReport(SessionType.MOVE_IN)
+                }) { Text("Move-in") }
+            }
+        )
     }
 }
 

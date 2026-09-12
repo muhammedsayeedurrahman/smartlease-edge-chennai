@@ -2,6 +2,7 @@ package com.smartlease.edge.sync
 
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import kotlinx.serialization.json.Json
+import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
@@ -26,11 +27,30 @@ object SyncClientFactory {
         isLenient = false
     }
 
+    /**
+     * Attaches the shared API key to every outgoing request.
+     *
+     * An interceptor rather than a header parameter on each [SyncApi] method: a header that
+     * must be on all four calls should not be four separate chances to forget it. A blank key
+     * adds no header at all, so the server sees "no credential" rather than "wrong
+     * credential" -- the same rejection, but a log line that says which mistake was made.
+     */
+    private fun apiKeyInterceptor(apiKey: String?): Interceptor = Interceptor { chain ->
+        val request = chain.request()
+        val authorized = if (apiKey.isNullOrBlank()) {
+            request
+        } else {
+            request.newBuilder().header(API_KEY_HEADER, apiKey).build()
+        }
+        chain.proceed(authorized)
+    }
+
     fun create(config: SyncConfig): ReportSyncClient {
         val okHttpClient = OkHttpClient.Builder()
             .connectTimeout(config.connectTimeoutMs, TimeUnit.MILLISECONDS)
             .readTimeout(config.readTimeoutMs, TimeUnit.MILLISECONDS)
             .writeTimeout(config.writeTimeoutMs, TimeUnit.MILLISECONDS)
+            .addInterceptor(apiKeyInterceptor(config.apiKey))
             .build()
 
         val retrofit = Retrofit.Builder()
@@ -41,4 +61,6 @@ object SyncClientFactory {
 
         return HttpReportSyncClient(retrofit.create(SyncApi::class.java), json, config)
     }
+
+    const val API_KEY_HEADER = "X-API-Key"
 }

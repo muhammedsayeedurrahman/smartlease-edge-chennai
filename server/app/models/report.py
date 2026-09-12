@@ -51,9 +51,22 @@ class ReportCreateRequest(BaseModel):
 
 
 class ReportCreateResponse(BaseModel):
+    """The response to POST /reports.
+
+    `reportToken` is the per-report secret, and it is returned exactly once --
+    in the response that first creates the report. A client that loses it
+    cannot fetch or countersign that report again, and the server cannot
+    reissue it because only the hash is stored. That is the intended
+    trade-off: recoverable tokens would mean a server that can hand any
+    caller access to any report.
+    """
+
     reportId: str
     digestSha256: str
     serverReceivedAtEpochMs: int
+    # Absent on an idempotent re-submission of an already-stored report: the
+    # original token still stands and is not recoverable from the stored hash.
+    reportToken: str | None = None
 
 
 class CountersignatureResponse(BaseModel):

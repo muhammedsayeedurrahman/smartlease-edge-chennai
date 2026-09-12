@@ -17,6 +17,7 @@ from fastapi.responses import JSONResponse
 from app.body_guard import JsonOnlyBodyGuardMiddleware
 from app.config import API_V1_PREFIX, Settings, get_settings
 from app.errors import AppError
+from app.rate_limit import RateLimiter, RateLimitMiddleware
 from app.routes import health, reports
 from app.storage.db import create_connection
 from app.storage.report_repository import ReportRepository
@@ -24,8 +25,17 @@ from app.storage.report_repository import ReportRepository
 logger = logging.getLogger("smartlease_edge.server")
 
 
-def create_app(database_path: str | None = None) -> FastAPI:
-    settings: Settings = get_settings()
+def create_app(
+    database_path: str | None = None, settings: Settings | None = None
+) -> FastAPI:
+    """Build an app instance.
+
+    `settings` is injectable so a test can exercise a specific configuration
+    (no API key, a rate limit of one request) without mutating the process
+    environment and without depending on the order in which the cached
+    `get_settings()` was first called.
+    """
+    settings = settings if settings is not None else get_settings()
     effective_database_path = database_path if database_path is not None else settings.database_path
 
     app = FastAPI(
@@ -40,6 +50,12 @@ def create_app(database_path: str | None = None) -> FastAPI:
     app.add_middleware(
         JsonOnlyBodyGuardMiddleware,
         max_body_bytes=settings.max_request_body_bytes,
+    )
+    # Added last, so it wraps the body guard and runs first: a client that is
+    # already over its limit is rejected before anything parses its request.
+    app.add_middleware(
+        RateLimitMiddleware,
+        limiter=RateLimiter(settings.rate_limit_per_minute),
     )
 
     _register_exception_handlers(app)

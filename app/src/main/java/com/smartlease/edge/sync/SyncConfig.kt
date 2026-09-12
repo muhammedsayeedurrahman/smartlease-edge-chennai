@@ -33,7 +33,23 @@ data class SyncConfig(
     val readTimeoutMs: Long = DEFAULT_READ_TIMEOUT_MS,
     val writeTimeoutMs: Long = DEFAULT_WRITE_TIMEOUT_MS,
     /** Master switch. Callers must check this before invoking [ReportSyncClient] methods. */
-    val syncEnabled: Boolean = DEFAULT_SYNC_ENABLED
+    val syncEnabled: Boolean = DEFAULT_SYNC_ENABLED,
+    /**
+     * The backend's shared API key, sent as `X-API-Key` on every request.
+     *
+     * Null or blank means "this build has no credential". That is not treated as an error
+     * here -- the request still goes out and the server answers 401 -- because pretending a
+     * build is configured when it isn't would hide the misconfiguration rather than surface
+     * it. It is supplied by the caller (see `BuildConfig.SMARTLEASE_API_KEY`), never
+     * defaulted to a literal: a key committed to this file would be a key published to
+     * GitHub.
+     *
+     * It is worth stating what this key does not do. It ships inside the APK and is
+     * extractable by anyone willing to unzip it, so it raises the cost of anonymous abuse
+     * and is not user authentication. Per-report authorization is [the report token]
+     * [ReportUploadAck.reportToken]. See server/SECURITY.md.
+     */
+    val apiKey: String? = null
 ) {
     init {
         require(baseUrl.endsWith("/")) { "baseUrl must end with '/', was: $baseUrl" }

@@ -32,6 +32,23 @@ sealed interface SyncResult<out T> {
      */
     data class ValidationRejected(val message: String) : SyncResult<Nothing>
 
+    /**
+     * A 401: the backend refused this build's API key. Separate from [ServerError] because it
+     * is never transient and retrying cannot fix it -- the build was shipped without a key,
+     * or with the wrong one, and someone has to rebuild it.
+     */
+    data class Unauthenticated(val message: String) : SyncResult<Nothing>
+
+    /**
+     * A 403: the API key was accepted but the per-report token was missing or wrong for this
+     * particular report. Distinct from [Unauthenticated] because the fix is different -- this
+     * build is a legitimate client, it just does not hold the secret this report was created
+     * under (most often because the report was uploaded by a different install, or the token
+     * was never persisted). Never retried automatically: a retry loop against a countersign
+     * endpoint is exactly what the token exists to stop.
+     */
+    data class NotAuthorized(val message: String) : SyncResult<Nothing>
+
     /** Any other non-2xx response the backend returned (5xx, or an unexpected 4xx). */
     data class ServerError(val httpStatusCode: Int, val message: String) : SyncResult<Nothing>
 

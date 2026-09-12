@@ -35,8 +35,18 @@ interface ReportSyncClient {
     /**
      * `POST /reports/{reportId}/countersign`. A role that already signed this report comes
      * back as [SyncResult.TamperConflict] (the backend's 409), not [SyncResult.Success].
+     *
+     * [reportToken] is the per-report secret from [ReportUploadAck.reportToken], issued once
+     * when this report was uploaded. Without it the backend answers 403 -- which is the
+     * point: this endpoint writes a signature attributed to a named role, so the shared API
+     * key alone must not be enough to reach it. Passing null is allowed and comes back as
+     * [SyncResult.NotAuthorized]; it is never silently treated as success.
      */
-    suspend fun countersign(reportId: String, request: CountersignRequest): SyncResult<CountersignAck>
+    suspend fun countersign(
+        reportId: String,
+        reportToken: String?,
+        request: CountersignRequest
+    ): SyncResult<CountersignAck>
 
     /** `GET /reports/{reportId}/verify?digest=...` -- does the server's copy match [digestSha256]? */
     suspend fun verifyReport(reportId: String, digestSha256: String): SyncResult<VerifyOutcome>

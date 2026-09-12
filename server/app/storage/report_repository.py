@@ -24,6 +24,10 @@ class ReportRecord:
     deposit_rupees: int
     total_deduction_rupees: int
     server_received_at_epoch_ms: int
+    # SHA-256 of the per-report token, never the token. None only for rows
+    # written before per-report tokens existed; callers must fail closed on
+    # those rather than treating "no token stored" as "no token required".
+    access_token_sha256: str | None = None
 
 
 @dataclass(frozen=True)
@@ -46,6 +50,7 @@ def _report_from_row(row: sqlite3.Row) -> ReportRecord:
         deposit_rupees=row["deposit_rupees"],
         total_deduction_rupees=row["total_deduction_rupees"],
         server_received_at_epoch_ms=row["server_received_at_epoch_ms"],
+        access_token_sha256=row["access_token_sha256"],
     )
 
 
@@ -72,8 +77,9 @@ class ReportRepository:
                 INSERT INTO reports (
                     report_id, property_ref, session_type, created_at_epoch_ms,
                     digest_sha256, app_version, findings_count, deposit_rupees,
-                    total_deduction_rupees, server_received_at_epoch_ms
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    total_deduction_rupees, server_received_at_epoch_ms,
+                    access_token_sha256
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     record.report_id,
@@ -86,6 +92,7 @@ class ReportRepository:
                     record.deposit_rupees,
                     record.total_deduction_rupees,
                     record.server_received_at_epoch_ms,
+                    record.access_token_sha256,
                 ),
             )
             self._connection.commit()

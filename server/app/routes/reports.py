@@ -5,15 +5,21 @@ models), the storage layer (immutable dataclasses), and the small set of
 `AppError` subclasses that the global exception handlers turn into the
 standard error envelope. Business rules that don't belong to either layer
 (duplicate-digest tamper detection, double-countersign) live here.
+
+Every route in this module sits behind `require_api_key`; the two that expose
+or alter one tenancy's record -- fetching the full report and countersigning
+it -- additionally require the per-report token issued at creation. See
+`app.auth` for what those two checks do and do not prove.
 """
 
 from __future__ import annotations
 
 import sqlite3
 
-from fastapi import APIRouter, Query, Request, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from fastapi.responses import JSONResponse
 
+from app.auth import hash_token, issue_report_token, require_api_key, require_report_token
 from app.errors import AlreadyCountersignedError, DigestMismatchError, ReportNotFoundError
 from app.models.countersign import CountersignCreateResponse, CountersignRequest
 from app.models.report import (
@@ -31,18 +37,21 @@ from app.storage.report_repository import (
 )
 from app.time_utils import now_epoch_ms
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_api_key)])
 
 
 def _repository(request: Request) -> ReportRepository:
     return request.app.state.report_repository
 
 
-def _create_response(record: ReportRecord) -> ReportCreateResponse:
+def _create_response(
+    record: ReportRecord, report_token: str | None = None
+) -> ReportCreateResponse:
     return ReportCreateResponse(
         reportId=record.report_id,
         digestSha256=record.digest_sha256,
         serverReceivedAtEpochMs=record.server_received_at_epoch_ms,
+        reportToken=report_token,
     )
 
 
@@ -83,11 +92,15 @@ def create_report(body: ReportCreateRequest, request: Request):
                 "digest; this is a tamper signal, not an ordinary duplicate."
             )
         # Identical resubmission: idempotent 200 with the record as it was
-        # first stored.
+        # first stored, and deliberately no token -- the one issued the first
+        # time is still the only one, and reissuing on demand would turn this
+        # endpoint into a way to mint access to any report whose id you know.
         return JSONResponse(
             status_code=status.HTTP_200_OK,
             content=_create_response(existing).model_dump(),
         )
+
+    report_token = issue_report_token()
 
     record = ReportRecord(
         report_id=body.reportId,
@@ -100,9 +113,10 @@ def create_report(body: ReportCreateRequest, request: Request):
         deposit_rupees=body.depositRupees,
         total_deduction_rupees=body.totalDeductionRupees,
         server_received_at_epoch_ms=now_epoch_ms(),
+        access_token_sha256=hash_token(report_token),
     )
     stored = repo.insert_report(record)
-    return _create_response(stored)
+    return _create_response(stored, report_token=report_token)
 
 
 @router.get("/reports/{report_id}", response_model=ReportRecordResponse)
@@ -111,6 +125,7 @@ def get_report(report_id: str, request: Request):
     record = repo.get_report(report_id)
     if record is None:
         raise ReportNotFoundError(f"No report found with id {report_id}")
+    require_report_token(request, report_id, record.access_token_sha256)
     countersignatures = repo.list_countersignatures(report_id)
     return _record_response(record, countersignatures)
 
@@ -125,6 +140,9 @@ def countersign_report(report_id: str, body: CountersignRequest, request: Reques
     report = repo.get_report(report_id)
     if report is None:
         raise ReportNotFoundError(f"No report found with id {report_id}")
+    # The endpoint the tamper-evidence story depends on: without this check a
+    # holder of the shared API key could sign in a tenant's name.
+    require_report_token(request, report_id, report.access_token_sha256)
 
     record = CountersignatureRecord(
         report_id=report_id,
@@ -148,6 +166,11 @@ def countersign_report(report_id: str, body: CountersignRequest, request: Reques
 
 
 @router.get("/reports/{report_id}/verify", response_model=VerifyResponse)
+# Intentionally API-key-only, no per-report token: this is the endpoint the QR
+# verification flow calls, and the token is not in the QR. It answers exactly
+# one boolean about a digest the caller already holds, and cannot mutate
+# anything -- but it does confirm that a given reportId exists, which is a
+# disclosure recorded in SECURITY.md rather than waved away.
 def verify_report(
     report_id: str,
     request: Request,

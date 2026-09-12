@@ -23,6 +23,8 @@ SmartLeaseEdge provides timestamped, sensor-backed property verification. The en
 
 An optional, **off-by-default** sync (`com.smartlease.edge.sync`, server in `server/`) uploads a signed findings digest plus rupee totals so a report can be held in custody and countersigned. Inspection photos, video and audio are never uploaded, and this is structural rather than a promise: the sync wire types carry no bitmap or byte-array field, the server schema has no binary column, and the API rejects unknown fields outright.
 
+What that custody does and does not prove is written down in [`server/SECURITY.md`](server/SECURITY.md), including the part that is uncomfortable: the server can prove a stored countersignature has not *changed*, but nothing in it binds a signature to a specific person. The API key ships inside the APK and is extractable. Treat both as stated limits, not omissions.
+
 ---
 
 ## Competitive Analysis

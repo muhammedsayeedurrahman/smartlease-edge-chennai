@@ -26,6 +26,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,6 +38,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
+import com.smartlease.edge.BuildConfig
 import com.smartlease.edge.deduction.DeductionEngine
 import com.smartlease.edge.deduction.DeductionLine
 import com.smartlease.edge.deduction.DeductionSummary
@@ -44,6 +46,10 @@ import com.smartlease.edge.report.FindingsDigest
 import com.smartlease.edge.report.InspectionReport
 import com.smartlease.edge.report.QrCode
 import com.smartlease.edge.report.ReportGenerator
+import com.smartlease.edge.sync.SyncClientFactory
+import com.smartlease.edge.sync.SyncUiState
+import com.smartlease.edge.sync.buildTimeSyncConfig
+import com.smartlease.edge.sync.syncReportUpload
 import com.smartlease.edge.ui.components.Lamp
 import com.smartlease.edge.ui.components.Panel
 import com.smartlease.edge.ui.components.StatusLamp
@@ -65,10 +71,51 @@ import java.util.Locale
  * none -- it is the exact claim that would collapse under scrutiny in a dispute.
  */
 @Composable
-fun ReportScreen(report: InspectionReport?, onBack: () -> Unit, onCountersign: () -> Unit = {}) {
+fun ReportScreen(
+    report: InspectionReport?,
+    onBack: () -> Unit,
+    // Carries the per-report token to the countersign screen, which needs it to record the
+    // signature server-side. Null is a legitimate value (sync off, upload failed, token never
+    // issued) and produces an honest "not synced" line there rather than a blocked button:
+    // the countersignature itself is captured and stored locally either way.
+    onCountersign: (reportToken: String?) -> Unit = {}
+) {
     val insets = WindowInsets.systemBars.asPaddingValues()
     val context = LocalContext.current
     var shareError by remember { mutableStateOf<String?>(null) }
+    var syncState by remember(report?.sessionId) { mutableStateOf<SyncUiState>(SyncUiState.Idle) }
+    // The server issues this exactly once, in the response to the upload below, and stores
+    // only its hash -- so a token not captured here cannot be recovered, and this report's
+    // countersignature can then never be recorded server-side. Held in composition state
+    // rather than written to disk: losing it to a process death costs only the server-side
+    // copy of the countersignature, while the local PDF, QR and signature are untouched.
+    // Persisting a bearer secret to buy back a best-effort convenience is the worse trade.
+    var reportToken by remember(report?.sessionId) { mutableStateOf<String?>(null) }
+
+    // Best-effort, after-the-fact upload of the report just generated. Never on the critical
+    // path: report generation, PDF write and QR rendering are all already complete by the
+    // time this screen is shown, and this effect cannot delay or undo any of that -- it only
+    // ever updates [syncState] for [SyncStatusPanel] to render. See SyncConfig.syncEnabled
+    // for why sync defaults to off, and syncReportUpload for why a disabled config never
+    // reaches the network at all.
+    LaunchedEffect(report?.sessionId) {
+        val currentReport = report ?: return@LaunchedEffect
+        val config = buildTimeSyncConfig()
+        if (!config.syncEnabled) {
+            syncState = SyncUiState.Disabled
+            return@LaunchedEffect
+        }
+        syncState = SyncUiState.InFlight
+        val outcome = syncReportUpload(
+            report = currentReport,
+            propertyRef = currentReport.propertyLabel,
+            appVersion = BuildConfig.VERSION_NAME,
+            config = config,
+            client = SyncClientFactory.create(config)
+        )
+        syncState = outcome.uiState
+        reportToken = outcome.reportToken
+    }
 
     Column(
         Modifier
@@ -265,6 +312,9 @@ fun ReportScreen(report: InspectionReport?, onBack: () -> Unit, onCountersign: (
                     }
                 }
 
+                Spacer(Modifier.height(10.dp))
+                SyncStatusPanel(syncState, Modifier.fillMaxWidth())
+
                 Spacer(Modifier.height(12.dp))
                 Button(
                     onClick = { shareError = shareReport(context, report) },
@@ -275,7 +325,7 @@ fun ReportScreen(report: InspectionReport?, onBack: () -> Unit, onCountersign: (
 
                 Spacer(Modifier.height(8.dp))
                 TextButton(
-                    onClick = onCountersign,
+                    onClick = { onCountersign(reportToken) },
                     modifier = Modifier.fillMaxWidth().height(48.dp)
                 ) {
                     Text("Countersign with another phone", style = MaterialTheme.typography.titleMedium)

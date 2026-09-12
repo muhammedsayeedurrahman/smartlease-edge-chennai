@@ -89,6 +89,7 @@ venv step above is for a clean machine.)
 From `server/`:
 
 ```bash
+export SMARTLEASE_API_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
@@ -96,12 +97,21 @@ Then, e.g.:
 
 ```bash
 curl http://127.0.0.1:8000/api/v1/health
+curl -H "X-API-Key: $SMARTLEASE_API_KEY" http://127.0.0.1:8000/api/v1/reports/<id>
 ```
 
-### Configuration (environment variables, all optional)
+`SMARTLEASE_API_KEY` is not optional. Started without it, the server answers
+`/health` normally and returns `503 api_key_not_configured` on every `/reports`
+route — it fails closed rather than serving report traffic anonymously. See
+[SECURITY.md](SECURITY.md) for why, and for what this key does and does not
+prove.
+
+### Configuration (environment variables)
 
 | Variable | Default | Purpose |
 |---|---|---|
+| `SMARTLEASE_API_KEY` | **none — required** | Shared client key, checked as `X-API-Key` on every `/reports` route |
+| `SMARTLEASE_RATE_LIMIT_PER_MINUTE` | `60` | Per-client request ceiling, applied to every route |
 | `SMARTLEASE_SERVER_VERSION` | `0.1.0` | Version string returned by `/health` |
 | `SMARTLEASE_DATABASE_PATH` | `smartlease_reports.db` | SQLite file path |
 | `SMARTLEASE_MAX_REQUEST_BODY_BYTES` | `16384` | Hard cap on request body size |
@@ -120,28 +130,29 @@ With coverage:
 python -m pytest --cov=app --cov-report=term-missing
 ```
 
-**Actual result when this was built** (28 tests, 99% statement coverage on
-`app/`):
+**Actual result** (54 tests, 99% statement coverage on `app/`):
 
 ```
-28 passed, 1 warning in 2.73s
+54 passed, 1 warning in 2.11s
 
 Name                               Stmts   Miss  Cover   Missing
 ----------------------------------------------------------------
 app\__init__.py                        0      0   100%
+app\auth.py                           23      0   100%
 app\body_guard.py                     33      2    94%   62-63
-app\config.py                         16      0   100%
-app\errors.py                         24      0   100%
-app\main.py                           37      2    95%   73-74
+app\config.py                         19      0   100%
+app\errors.py                         36      0   100%
+app\main.py                           39      2    95%   89-90
 app\models\countersign.py             15      0   100%
-app\models\report.py                  53      0   100%
+app\models\report.py                  54      0   100%
+app\rate_limit.py                     58      0   100%
 app\routes\health.py                   7      0   100%
-app\routes\reports.py                 54      0   100%
-app\storage\db.py                     10      0   100%
-app\storage\report_repository.py      52      0   100%
+app\routes\reports.py                 58      0   100%
+app\storage\db.py                     17      0   100%
+app\storage\report_repository.py      53      0   100%
 app\time_utils.py                      4      0   100%
 ----------------------------------------------------------------
-TOTAL                                305      4    99%
+TOTAL                                416      4    99%
 ```
 
 The two uncovered branches are: an invalid (non-numeric) `Content-Length`
@@ -155,6 +166,17 @@ are fully isolated and can run in any order.
 ## API
 
 Base path: `/api/v1`.
+
+**Every `/reports` route requires `X-API-Key`.** `GET /reports/{id}` and
+`POST /reports/{id}/countersign` additionally require `X-Report-Token`, the
+per-report secret issued once in the `201` that created the report.
+`/health` and `/verify` do not take a report token. Common auth responses,
+omitted from each endpoint below to avoid repeating them five times:
+
+- `401 unauthorized` — missing or wrong `X-API-Key`.
+- `403 forbidden` — missing or wrong `X-Report-Token` for that report.
+- `429 rate_limited` — over the per-client limit; carries `Retry-After`.
+- `503 api_key_not_configured` — the server was started without a key.
 
 Every error response uses the envelope:
 
@@ -186,8 +208,10 @@ Request:
 }
 ```
 
-- `201` on first creation: `{"reportId", "digestSha256", "serverReceivedAtEpochMs"}`.
-- `200` (idempotent) if `reportId` already exists with the **same** `digestSha256` — returns the original record's response, including the original `serverReceivedAtEpochMs`.
+- `201` on first creation: `{"reportId", "digestSha256", "serverReceivedAtEpochMs", "reportToken"}`.
+  `reportToken` is issued **exactly once, here**. The server stores only its hash and cannot
+  reissue it. It is required by `GET /reports/{id}` and the countersign endpoint.
+- `200` (idempotent) if `reportId` already exists with the **same** `digestSha256` — returns the original record's response, including the original `serverReceivedAtEpochMs`, and `"reportToken": null`: re-POSTing a known id must not mint access to it.
 - `409 digest_mismatch` if `reportId` already exists with a **different** `digestSha256` (treated as a tamper signal).
 - `422 validation_error` if `totalDeductionRupees > depositRupees`, if any field is malformed (bad UUID, digest not 64 lowercase hex chars, negative counts, unknown `sessionType`, etc.), or if the body contains any field not in this contract.
 - `415 unsupported_content_type` if the request is not `application/json`.

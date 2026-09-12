@@ -1,5 +1,6 @@
 package com.smartlease.edge.report
 
+import com.smartlease.edge.data.SessionType
 import com.smartlease.edge.deduction.DeductionSummary
 
 data class ReportSection(val title: String, val body: String)
@@ -17,5 +18,14 @@ data class InspectionReport(
     val deductions: DeductionSummary? = null,
     /** Null only when [findingCount] is 0. Feeds the Section 63 certificate's capture window. */
     val earliestFindingEpochMillis: Long? = null,
-    val latestFindingEpochMillis: Long? = null
+    val latestFindingEpochMillis: Long? = null,
+    /**
+     * Which kind of walkthrough produced this report. Defaulted to [SessionType.MOVE_OUT]
+     * only for source compatibility with existing call sites that predate this field --
+     * [com.smartlease.edge.ui.screens.WalkthroughScreen] always passes the real value it
+     * already has in scope. Consumed by [com.smartlease.edge.sync] so an uploaded report is
+     * tagged with the same session type the walkthrough was actually run as, never guessed
+     * after the fact.
+     */
+    val sessionType: SessionType = SessionType.MOVE_OUT
 )

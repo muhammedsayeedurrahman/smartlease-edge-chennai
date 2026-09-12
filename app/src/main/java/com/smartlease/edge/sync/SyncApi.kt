@@ -4,6 +4,7 @@ import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -27,9 +28,14 @@ internal interface SyncApi {
     // response schema for this endpoint (only the 201 status), and a converter that eagerly
     // tries to decode an empty or unspecified body would throw before HttpReportSyncClient
     // ever gets a chance to turn that into a typed SyncResult.
+    // The per-report token goes on this call specifically: it is the endpoint that writes a
+    // signature in a tenant's or landlord's name, so the shared API key alone must not be
+    // enough to reach it. Retrofit omits a null @Header entirely, which is what makes the
+    // "no token held" case arrive at the server as a clean 403 rather than a literal "null".
     @POST("reports/{reportId}/countersign")
     suspend fun countersign(
         @Path("reportId") reportId: String,
+        @Header("X-Report-Token") reportToken: String?,
         @Body body: CountersignRequest
     ): Response<ResponseBody>
 

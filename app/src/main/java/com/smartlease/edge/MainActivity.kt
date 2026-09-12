@@ -8,6 +8,12 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavType
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -15,9 +21,17 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.smartlease.edge.data.SessionType
+import com.smartlease.edge.report.InspectionReport
+import com.smartlease.edge.report.PropertyReportBuilder
+import com.smartlease.edge.report.ReportGenerator
 import com.smartlease.edge.ui.AppViewModel
 import com.smartlease.edge.ui.screens.*
 import com.smartlease.edge.ui.theme.SmartLeaseEdgeTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.util.UUID
 
 class MainActivity : ComponentActivity() {
 
@@ -61,6 +75,18 @@ fun SmartLeaseApp(
     onFirstLaunchComplete: () -> Unit = {}
 ) {
     val navController = rememberNavController()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    // The report produced by the last "Generate report" tap, handed to ReportScreen and then
+    // to CountersignScreen. Held here rather than rebuilt per screen because rebuilding it
+    // would produce a second report object -- a new generatedAt, and therefore a different
+    // document -- for the same session.
+    var generatedReport by remember { mutableStateOf<InspectionReport?>(null) }
+    // The per-report token the backend issues once, on upload. ReportScreen captures it and
+    // hands it here so the countersign screen can record the signature server-side; null is
+    // a legitimate value and produces an honest "not synced" line there, never a block.
+    var generatedReportToken by remember { mutableStateOf<String?>(null) }
 
     val startDestination = if (isFirstLaunch) "welcome" else "home"
 
@@ -120,7 +146,61 @@ fun SmartLeaseApp(
                 onBack = { navController.popBackStack("home", inclusive = false) },
                 onRoomSelected = { roomId ->
                     navController.navigate("room_config/$roomId")
+                },
+                onGenerateReport = { sessionType ->
+                    val property = viewModel.properties.find { it.id == propertyId }
+                        ?: return@PropertyDashboardScreen
+                    scope.launch {
+                        val sessionId = UUID.randomUUID().toString()
+                        // Digest, PDF rendering and deduction arithmetic are all real work
+                        // over every captured frame's detections; off the main thread so a
+                        // property with many areas does not freeze the UI mid-tap.
+                        val report = withContext(Dispatchers.Default) {
+                            val findings = PropertyReportBuilder.findingsFor(
+                                property = property,
+                                rooms = viewModel.getRoomsForProperty(propertyId),
+                                sessionId = sessionId,
+                                sessionType = sessionType
+                            )
+                            val built = ReportGenerator.buildReport(
+                                sessionId = sessionId,
+                                propertyLabel = property.name,
+                                findings = findings,
+                                depositRupees = PropertyReportBuilder.depositRupeesOrNull(property),
+                                // No baseline: this flow has no stored move-in session to diff
+                                // against yet, so a move-out report prices every finding. That
+                                // is the honest reading of "we have no prior record", not a
+                                // bug, but it is why the move-in/move-out question is asked.
+                                baselineKeys = emptySet(),
+                                sessionType = sessionType
+                            )
+                            ReportGenerator.renderToPdf(context, built)
+                            built
+                        }
+                        generatedReport = report
+                        generatedReportToken = null
+                        navController.navigate("report/${report.sessionId}")
+                    }
                 }
+            )
+        }
+        composable(
+            route = "report/{sessionId}",
+            arguments = listOf(navArgument("sessionId") { type = NavType.StringType })
+        ) {
+            ReportScreen(
+                report = generatedReport,
+                onBack = { navController.popBackStack() },
+                onCountersign = { reportToken ->
+                    generatedReportToken = reportToken
+                    navController.navigate("countersign")
+                }
+            )
+        }
+        composable("countersign") {
+            CountersignScreen(
+                report = generatedReport,
+                onBack = { navController.popBackStack() }
             )
         }
         composable(

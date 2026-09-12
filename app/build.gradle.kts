@@ -35,6 +35,22 @@ android {
                 ?: emptyList()
             abiFilters += extraAbis
         }
+
+        // The backend's shared API key. NEVER a literal in this file or in source: it comes
+        // from `-PsmartleaseApiKey=...`, from gradle.properties (git-ignored), or from the
+        // SMARTLEASE_API_KEY environment variable, in that order.
+        //
+        // An empty value is the honest default and the safe one. It means this build has no
+        // credential, every /reports call it makes would come back 401, and sync stays off
+        // (see SyncConfig.syncEnabled, which is opt-in anyway).
+        //
+        // Worth being blunt about what this is NOT: a key compiled into an APK is extractable
+        // by anyone willing to unzip it. It raises the cost of anonymous abuse; it is not user
+        // authentication. See server/SECURITY.md.
+        val smartleaseApiKey = (project.findProperty("smartleaseApiKey") as String?)
+            ?: System.getenv("SMARTLEASE_API_KEY")
+            ?: ""
+        buildConfigField("String", "SMARTLEASE_API_KEY", "\"$smartleaseApiKey\"")
     }
 
     buildTypes {

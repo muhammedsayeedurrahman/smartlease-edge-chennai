@@ -791,7 +791,8 @@ fun WalkthroughScreen(sessionType: SessionType, onReportGenerated: (InspectionRe
                         // rebuild it, producing a second report object for the same session.
                         val report = withContext(Dispatchers.Default) {
                             val r = ReportGenerator.buildReport(
-                                sessionId, PROPERTY_LABEL, stored, depositRupees, baselineKeys
+                                sessionId, PROPERTY_LABEL, stored, depositRupees, baselineKeys,
+                                sessionType = sessionType
                             )
                             ReportGenerator.renderToPdf(context, r)
                             r

@@ -1,8 +1,11 @@
 """Runtime configuration, sourced from environment variables with safe defaults.
 
-No secrets live here: this service only ever stores a digest and small
-metadata, never inspection media, so there is nothing sensitive to configure
-beyond where the SQLite file lives and how the server describes itself.
+The service stores only a digest and small metadata, never inspection media,
+so the stored data is not sensitive. Access to it is: anyone who can call
+`POST /reports/{id}/countersign` can forge the signature that the whole
+tamper-evidence story rests on. `SMARTLEASE_API_KEY` is therefore the one
+genuine secret here, it has no default, and the report endpoints fail closed
+without it -- see `app.auth`.
 """
 
 from __future__ import annotations
@@ -19,6 +22,10 @@ DEFAULT_DATABASE_PATH = "smartlease_reports.db"
 # against accidentally attaching image/video/audio payloads, on top of the
 # schema-level `extra="forbid"` validation.
 DEFAULT_MAX_REQUEST_BODY_BYTES = 16_384
+# Deliberately generous: a real inspection uploads one report and up to two
+# countersignatures, so anything near this ceiling is abuse or a broken retry
+# loop, not a user.
+DEFAULT_RATE_LIMIT_PER_MINUTE = 60
 
 API_V1_PREFIX = "/api/v1"
 
@@ -28,6 +35,10 @@ class Settings:
     server_version: str
     database_path: str
     max_request_body_bytes: int
+    # None means "not configured", which makes every /reports route return 503
+    # rather than serving anonymous traffic. There is no default on purpose.
+    api_key: str | None
+    rate_limit_per_minute: int
 
 
 @lru_cache
@@ -39,5 +50,9 @@ def get_settings() -> Settings:
             os.environ.get(
                 "SMARTLEASE_MAX_REQUEST_BODY_BYTES", DEFAULT_MAX_REQUEST_BODY_BYTES
             )
+        ),
+        api_key=(os.environ.get("SMARTLEASE_API_KEY") or "").strip() or None,
+        rate_limit_per_minute=int(
+            os.environ.get("SMARTLEASE_RATE_LIMIT_PER_MINUTE", DEFAULT_RATE_LIMIT_PER_MINUTE)
         ),
     )

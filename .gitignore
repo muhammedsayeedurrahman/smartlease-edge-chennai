@@ -166,3 +166,14 @@ ml/YOLOV8/runs/
 # toolchain is pinned deliberately (see tag demo-known-good); do not let a sync move it.
 .idea/
 gradle/gradle-daemon-jvm.properties
+
+# Server runtime artifacts. The SQLite file is a local scratch database, and .coverage is a
+# per-run measurement file — neither is source, and a committed database would also be a
+# committed set of per-report token hashes.
+server/*.db
+server/.coverage
+server/.pytest_cache/
+server/**/__pycache__/
+
+# Downloaded evaluation datasets — re-fetchable, not source.
+ml/data/external/

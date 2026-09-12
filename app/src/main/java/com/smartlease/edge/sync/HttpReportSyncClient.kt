@@ -44,13 +44,14 @@ internal class HttpReportSyncClient(
 
     override suspend fun countersign(
         reportId: String,
+        reportToken: String?,
         request: CountersignRequest
     ): SyncResult<CountersignAck> {
         if (reportId.isBlank()) return SyncResult.ValidationRejected("reportId must not be blank")
         request.validationError()?.let { return SyncResult.ValidationRejected(it) }
         return guarded {
             withContext(dispatcher) {
-                when (val outcome = safeCall { api.countersign(reportId, request) }) {
+                when (val outcome = safeCall { api.countersign(reportId, reportToken, request) }) {
                     is CallOutcome.Failure -> outcome.result
                     is CallOutcome.Completed -> {
                         val response = outcome.response
@@ -110,6 +111,8 @@ internal class HttpReportSyncClient(
     private fun mapErrorResponse(response: Response<*>): SyncResult<Nothing> {
         val message = errorMessage(response)
         return when (response.code()) {
+            401 -> SyncResult.Unauthenticated(message)
+            403 -> SyncResult.NotAuthorized(message)
             409 -> SyncResult.TamperConflict(message)
             422 -> SyncResult.ValidationRejected(message)
             else -> SyncResult.ServerError(response.code(), message)
