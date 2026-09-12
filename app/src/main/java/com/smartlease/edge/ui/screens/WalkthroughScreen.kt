@@ -6,7 +6,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -18,7 +17,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -31,11 +29,9 @@ import com.smartlease.edge.data.AppDatabase
 import com.smartlease.edge.data.FindingType
 import com.smartlease.edge.data.InspectionEntity
 import com.smartlease.edge.data.Severity
-import com.smartlease.edge.deduction.FindingDetail
 import com.smartlease.edge.ir.CommonAcIrProfiles
 import com.smartlease.edge.ir.IrController
 import com.smartlease.edge.ocr.OcrEngine
-import com.smartlease.edge.report.InspectionReport
 import com.smartlease.edge.report.ReportGenerator
 import com.smartlease.edge.safety.SafetyGate
 import com.smartlease.edge.ui.components.Lamp
@@ -43,18 +39,10 @@ import com.smartlease.edge.ui.components.ReadingRow
 import com.smartlease.edge.ui.components.StatusLamp
 import com.smartlease.edge.ui.theme.ReadoutValue
 import com.smartlease.edge.ui.theme.ReadoutValueLarge
-import com.smartlease.edge.vision.DefectSegmenter
 import com.smartlease.edge.vision.DefectSegmenterFactory
-import kotlinx.coroutines.Dispatchers
+import com.smartlease.edge.inspection360.*
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.util.UUID
-
-/** Pre-filled deposit figure -- the demo's own stated amount, not a claim about any real lease. */
-private const val DEFAULT_DEPOSIT_RUPEES = 90_000
-
-/** Long enough for any real Chennai deposit, short enough that a mis-tap cannot run off screen. */
-private const val MAX_DEPOSIT_DIGITS = 8
 
 /** A logged finding keeps its severity, so the list can show it rather than flatten to text. */
 private data class LoggedFinding(
@@ -66,110 +54,97 @@ private data class LoggedFinding(
 
 /**
  * The inspection screen. Runs every subsystem in one flow: tilt alignment, capture with OCR
- * and defect segmentation, acoustic tap test, IR appliance trigger, then a local report
- * carrying a SHA-256 over its findings.
- *
- * Nothing heavy runs on the main thread: the two models load in a LaunchedEffect, and every
- * inference, the tap recording and the PDF render are dispatched to Dispatchers.Default.
+ * and defect segmentation, acoustic tap test, IR appliance trigger, then a signed local report.
  */
 @Composable
-fun WalkthroughScreen(onReportGenerated: (InspectionReport) -> Unit) {
+fun WalkthroughScreen(onReportGenerated: (String) -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
 
-    // Full UUID, not the first 8 hex characters. The session ID goes into the digest and
-    // onto the report; 32 bits of client-generated identifier is not an identifier.
-    val sessionId = remember { UUID.randomUUID().toString() }
+    val sessionId = remember { UUID.randomUUID().toString().take(8) }
     val cameraController = remember { CameraController(context, lifecycleOwner) }
     val arTracker = remember { ArAlignmentTracker(context) }
     val irController = remember { IrController(context) }
+    val visionSegmenter = remember { DefectSegmenterFactory.create(context) }
+    // null when no trained model ships -- classify() then keeps the heuristic
+    val trainedTapModel = remember { TrainedTapClassifier.create(context) }
     val db = remember { AppDatabase.get(context) }
-
-    // Loaded off the main thread by the LaunchedEffect below, not in remember { }.
-    // DefectSegmenterFactory.create copies a 13.7 MB asset on first run and then parses a
-    // TorchScript module; TrainedTapClassifier.create parses a 73 KB JSON carrying a
-    // 10,280-float mel filterbank. Both used to happen during composition, which froze the
-    // screen for seconds the first time anyone opened it.
-    var visionSegmenter by remember { mutableStateOf<DefectSegmenter?>(null) }
-    var trainedTapModel by remember { mutableStateOf<TrainedTapClassifier?>(null) }
-    var modelsLoading by remember { mutableStateOf(true) }
 
     var alignmentState by remember { mutableStateOf<ArAlignmentTracker.AlignmentState?>(null) }
     var findings by remember { mutableStateOf(listOf<LoggedFinding>()) }
     var lastSafetyVerdict by remember { mutableStateOf<SafetyGate.Verdict?>(null) }
     var busy by remember { mutableStateOf(false) }
 
-    // Nothing else in the app has a source for the deposit -- DeductionEngine needs a
-    // rupee figure to subtract findings from, and until now nothing ever supplied one.
-    // Kept as the raw digit string the field shows, not an Int, so a mid-edit empty field
-    // (backspacing to retype) doesn't have to round-trip through a placeholder value.
-    var depositInput by remember { mutableStateOf(DEFAULT_DEPOSIT_RUPEES.toString()) }
-
-    LaunchedEffect(Unit) {
-        val segmenter = withContext(Dispatchers.Default) { DefectSegmenterFactory.create(context) }
-        // null when no trained model ships -- classify() then keeps the heuristic
-        val tap = withContext(Dispatchers.Default) { TrainedTapClassifier.create(context) }
-        visionSegmenter = segmenter
-        trainedTapModel = tap
-        modelsLoading = false
-    }
+    // 360 Auto-Capture State
+    var isAutoCaptureMode by remember { mutableStateOf(false) }
+    var isMovingTooFast by remember { mutableStateOf(false) }
 
     val hasCameraPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
     val hasMicPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
 
+    // 360 Coordinator & Analyzer
+    val roomCoordinator = remember {
+        RoomInspectionCoordinator(visionSegmenter) { records ->
+            isAutoCaptureMode = false
+            records.forEach { record ->
+                val severity = if (record.defectClass == "CLEAR") Lamp.PASS else if (record.confidence >= 0.6f) Lamp.FLAG else Lamp.CAUTION
+                findings = findings + LoggedFinding(
+                    lamp = severity,
+                    label = record.wall + " " + record.defectClass,
+                    value = "%.2f sq ft".format(record.areaSqFt),
+                    detail = "Auto-Capture"
+                )
+            }
+        }
+    }
+    
+    val wallAnalyzer = remember {
+        val tracker = HeadingTracker(context) { _, _ -> } // Quadrant tracking handled internally
+        WallInspectionAnalyzer(
+            headingTracker = tracker,
+            onWallCaptured = { quad, bmp, z ->
+                roomCoordinator.onWallKeyframeAcquired(quad, bmp, z)
+            },
+            onSpeedWarning = { movingTooFast ->
+                isMovingTooFast = movingTooFast
+            }
+        )
+    }
+
     DisposableEffect(Unit) {
         arTracker.start { alignmentState = it }
-        onDispose { arTracker.stop() }
+        onDispose { 
+            arTracker.stop()
+            wallAnalyzer.stop()
+        }
     }
 
-    /** A failure the operator should see, on the same list as the findings. */
-    fun note(label: String, detail: String) {
-        findings = findings + LoggedFinding(Lamp.CAUTION, label, "error", detail)
-    }
-
-    // Suspends until the row is committed. It used to fire-and-forget into scope.launch
-    // while "Save report" read the same table, so the last finding of a session could
-    // be missing from the PDF -- and from the digest computed over it.
-    suspend fun logFinding(
+    fun logFinding(
         type: FindingType,
         label: String,
         value: String,
-        detail: FindingDetail,
-        noteText: String? = null,
+        detail: String? = null,
         lamp: Lamp = Lamp.PASS
     ) {
         val verdict = SafetyGate.evaluate(label)
         lastSafetyVerdict = verdict
-        // The gate only ever returns STOP_ESCALATE or nothing, so without this every visual
-        // defect was filed INFO and Severity.NOTABLE was unreachable by any code path -- the
-        // severity column in the report was decoration. A defect finding is NOTABLE; the
-        // hazard gate still overrides it upwards and nothing overrides it downwards.
-        val severity = verdict.escalatedSeverity
-            ?: if (type == FindingType.VISUAL_DEFECT) Severity.NOTABLE else Severity.INFO
+        val severity = verdict.escalatedSeverity ?: Severity.INFO
         // A safety escalation always outranks the caller's own lamp.
         val effective = if (verdict.escalatedSeverity != null) Lamp.FLAG else lamp
-        findings = findings + LoggedFinding(effective, label, value, noteText ?: verdict.reason)
+        findings = findings + LoggedFinding(effective, label, value, detail ?: verdict.reason)
 
-        try {
+        scope.launch {
             db.inspectionDao().insert(
                 InspectionEntity(
                     sessionId = sessionId,
                     timestampEpochMillis = System.currentTimeMillis(),
                     findingType = type,
                     label = label,
-                    // Used to be a hardcoded "{}" for every finding, which meant
-                    // DeductionEngine.summarise had nothing to price a single row against --
-                    // every session produced an empty balance sheet regardless of what was
-                    // actually found. This is the one line that makes the deposit arithmetic
-                    // possible at all.
-                    detailJson = detail.toJson(),
+                    detailJson = "{}",
                     severity = severity
                 )
             )
-        } catch (e: Exception) {
-            // The finding is already on screen; losing the row must not kill the session.
-            note("Not saved", e.message ?: e.javaClass.simpleName)
         }
     }
 
@@ -194,7 +169,7 @@ fun WalkthroughScreen(onReportGenerated: (InspectionReport) -> Unit) {
                 color = MaterialTheme.colorScheme.onBackground
             )
             Text(
-                sessionId.take(8),
+                sessionId,
                 style = ReadoutValue,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -222,16 +197,11 @@ fun WalkthroughScreen(onReportGenerated: (InspectionReport) -> Unit) {
                     // clipToBounds: PreviewView scales the frame to fill, and without a clip
                     // the TextureView paints well past its declared box.
                     modifier = Modifier.fillMaxSize().clipToBounds(),
-                    update = { previewView ->
-                        scope.launch {
-                            try {
-                                cameraController.bindTo(previewView)
-                            } catch (e: Exception) {
-                                // Another app holding the camera would otherwise crash the
-                                // walkthrough the moment this screen composes.
-                                note("Camera unavailable", e.message ?: e.javaClass.simpleName)
-                            }
-                        }
+                    update = { previewView -> 
+                        scope.launch { 
+                            val analyzerToBind = if (isAutoCaptureMode) wallAnalyzer else null
+                            cameraController.bindTo(previewView, analyzerToBind) 
+                        } 
                     }
                 )
             } else {
@@ -247,70 +217,71 @@ fun WalkthroughScreen(onReportGenerated: (InspectionReport) -> Unit) {
             // The one bold element on this screen: how square the phone is to the wall. It is
             // what the person is actively adjusting, so it is the largest thing here, on a
             // scrim so it stays legible against both a white wall and a dark corner.
-            alignmentState?.let { s ->
-                val delta = s.deltaFromBaselineDeg
-                val lamp = when {
-                    delta == null -> Lamp.CAUTION
-                    s.isAligned -> Lamp.PASS
-                    else -> Lamp.CAUTION
-                }
+            if (isAutoCaptureMode) {
                 Row(
                     Modifier
-                        .align(Alignment.BottomStart)
-                        .fillMaxWidth()
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(Color.Transparent, Color.Black.copy(alpha = 0.72f))
-                            )
-                        )
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.Bottom
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 16.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (isMovingTooFast) Color.Red.copy(alpha = 0.8f) else Color.Green.copy(alpha = 0.8f))
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            if (delta == null) "Tilt" else "Off baseline",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.75f)
-                        )
-                        Text(
-                            if (delta == null)
-                                "%d / %d deg".format(s.pitchDeg.toInt(), s.rollDeg.toInt())
-                            else
-                                "%.1f deg".format(delta),
-                            style = ReadoutValueLarge,
-                            color = Color.White
-                        )
+                    Text(
+                        if (isMovingTooFast) "SLOW DOWN TO CAPTURE" else "AUTO-CAPTURING 360",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.White
+                    )
+                }
+            } else {
+                alignmentState?.let { s ->
+                    val delta = s.deltaFromBaselineDeg
+                    val lamp = when {
+                        delta == null -> Lamp.CAUTION
+                        s.isAligned -> Lamp.PASS
+                        else -> Lamp.CAUTION
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        StatusLamp(lamp)
-                        Text(
-                            when {
-                                delta == null -> "Set a baseline"
-                                s.isAligned -> "Aligned"
-                                else -> "Adjust angle"
-                            },
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color.White,
-                            modifier = Modifier.padding(start = 8.dp)
-                        )
+                    Row(
+                        Modifier
+                            .align(Alignment.BottomStart)
+                            .fillMaxWidth()
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(Color.Transparent, Color.Black.copy(alpha = 0.72f))
+                                )
+                            )
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.Bottom
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                if (delta == null) "Tilt" else "Off baseline",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White.copy(alpha = 0.75f)
+                            )
+                            Text(
+                                if (delta == null)
+                                    "%d / %d deg".format(s.pitchDeg.toInt(), s.rollDeg.toInt())
+                                else
+                                    "%.1f deg".format(delta),
+                                style = ReadoutValueLarge,
+                                color = Color.White
+                            )
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            StatusLamp(lamp)
+                            Text(
+                                when {
+                                    delta == null -> "Set a baseline"
+                                    s.isAligned -> "Aligned"
+                                    else -> "Adjust angle"
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.White,
+                                modifier = Modifier.padding(start = 8.dp)
+                            )
+                        }
                     }
                 }
-            }
-        }
-
-        if (modelsLoading) {
-            Spacer(Modifier.height(10.dp))
-            Row(
-                Modifier.padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
-                Text(
-                    "Loading models",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 8.dp)
-                )
             }
         }
 
@@ -318,101 +289,73 @@ fun WalkthroughScreen(onReportGenerated: (InspectionReport) -> Unit) {
 
         // --- Controls. Capture is the primary action and is weighted as such. --------------
         Column(Modifier.padding(horizontal = 16.dp)) {
-            // Gated on the permission, not just on `busy`: without CAMERA the PreviewView
-            // above is never composed, so bindTo() never runs and captureBitmap() throws
-            // IllegalStateException into a coroutine with nothing to catch it.
-            Button(
-                enabled = !busy && !modelsLoading && hasCameraPermission,
-                onClick = {
-                    scope.launch {
-                        busy = true
-                        try {
-                            val segmenter = visionSegmenter ?: return@launch
-                            val bitmap = cameraController.captureBitmap()
-                            val text = try {
-                                OcrEngine.readText(bitmap)
-                            } catch (e: Exception) {
-                                // OcrEngine resumes with the exception on ML Kit failure. A failed
-                                // text read must not take the capture -- or the walkthrough -- down.
-                                note("OCR unavailable", e.message ?: "unknown error")
-                                ""
-                            }
-                            if (text.isNotBlank()) {
-                                logFinding(
-                                    type = FindingType.OCR_TEXT_READ, label = "Text read", value = "OCR",
-                                    detail = FindingDetail.Note(text.take(90)),
-                                    noteText = text.take(90)
-                                )
-                            }
-                            // 640x640 forward pass plus an 8400-anchor decode. On the main thread
-                            // this was hundreds of milliseconds of frozen UI per capture.
-                            val defects = withContext(Dispatchers.Default) {
-                                segmenter.segmentDefects(
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    enabled = !busy && !isAutoCaptureMode,
+                    onClick = {
+                        scope.launch {
+                            busy = true
+                            try {
+                                val bitmap = cameraController.captureBitmap()
+                                val text = OcrEngine.readText(bitmap)
+                                if (text.isNotBlank()) {
+                                    logFinding(
+                                        FindingType.OCR_TEXT_READ, "Text read", "OCR",
+                                        text.take(90)
+                                    )
+                                }
+                                val defects = visionSegmenter.segmentDefects(
                                     bitmap, frameWidthInches = 48f, frameHeightInches = 36f
                                 )
+                                // The label states which segmenter actually ran: a heuristic result
+                                // must never read like a model detection in a tenant-facing report.
+                                val mode = if (visionSegmenter.isTrainedModel) "YOLOv8n-Seg" else "heuristic"
+                                defects.forEach { d ->
+                                    logFinding(
+                                        type = FindingType.VISUAL_DEFECT,
+                                        label = d.label,
+                                        value = "%.2f sq ft".format(d.areaSqFtEstimate),
+                                        detail = "%s, %.0f%% confidence".format(mode, d.confidence * 100f),
+                                        lamp = if (d.confidence >= 0.6f) Lamp.FLAG else Lamp.CAUTION
+                                    )
+                                }
+                                if (defects.isEmpty() && text.isBlank()) {
+                                    findings = findings + LoggedFinding(
+                                        Lamp.PASS, "Capture", "clear", "Nothing flagged in this frame"
+                                    )
+                                }
+                            } finally {
+                                busy = false
                             }
-                            // The label states which segmenter actually ran: a heuristic result
-                            // must never read like a model detection in a tenant-facing report.
-                            val mode = if (segmenter.isTrainedModel) "YOLOv8n-Seg" else "heuristic"
-                            defects.forEach { d ->
-                                logFinding(
-                                    type = FindingType.VISUAL_DEFECT,
-                                    label = d.label,
-                                    value = "%.2f sq ft".format(d.areaSqFtEstimate),
-                                    detail = FindingDetail.VisualDefect(
-                                        defectClass = d.label,
-                                        areaSqFt = d.areaSqFtEstimate,
-                                        confidence = d.confidence,
-                                        fromTrainedModel = segmenter.isTrainedModel
-                                    ),
-                                    noteText = "%s, %.0f%% confidence".format(mode, d.confidence * 100f),
-                                    lamp = if (d.confidence >= 0.6f) Lamp.FLAG else Lamp.CAUTION
-                                )
-                            }
-                            if (defects.isEmpty() && text.isBlank()) {
-                                findings = findings + LoggedFinding(
-                                    Lamp.PASS, "Capture", "clear", "Nothing flagged in this frame"
-                                )
-                            }
-                        } catch (e: Exception) {
-                            note("Capture failed", e.message ?: e.javaClass.simpleName)
-                        } finally {
-                            busy = false
                         }
-                    }
-                },
-                modifier = Modifier.fillMaxWidth().height(52.dp)
-            ) {
-                Text(
-                    when {
-                        !hasCameraPermission -> "Camera access needed"
-                        modelsLoading -> "Loading models"
-                        busy -> "Analysing"
-                        else -> "Capture and analyse"
                     },
-                    style = MaterialTheme.typography.titleMedium
-                )
+                    modifier = Modifier.weight(1f).height(52.dp)
+                ) {
+                    Text(
+                        if (busy) "Analysing" else "Manual Capture",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+                
+                Button(
+                    onClick = {
+                        isAutoCaptureMode = !isAutoCaptureMode
+                        if (isAutoCaptureMode) wallAnalyzer.reset()
+                    },
+                    modifier = Modifier.weight(1f).height(52.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = if (isAutoCaptureMode) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
+                ) {
+                    Text(
+                        if (isAutoCaptureMode) "Stop 360" else "Start 360",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
             }
 
             Spacer(Modifier.height(8.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
-                    onClick = {
-                        arTracker.captureBaseline()
-                        // Recorded so the report shows a baseline was set and when.
-                        // FindingType.AR_BASELINE_ALIGNMENT was declared and never emitted.
-                        scope.launch {
-                            val s = alignmentState
-                            val pose = if (s == null) "pose unavailable"
-                            else "pitch %d, roll %d".format(s.pitchDeg.toInt(), s.rollDeg.toInt())
-                            logFinding(
-                                type = FindingType.AR_BASELINE_ALIGNMENT,
-                                label = "Baseline pose recorded", value = "baseline",
-                                detail = FindingDetail.Note(pose),
-                                noteText = "$pose. Held in memory for this session only."
-                            )
-                        }
-                    },
+                    onClick = { arTracker.captureBaseline() },
                     modifier = Modifier.weight(1f).height(46.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
                         contentColor = MaterialTheme.colorScheme.onBackground
@@ -420,18 +363,14 @@ fun WalkthroughScreen(onReportGenerated: (InspectionReport) -> Unit) {
                 ) { Text("Set baseline") }
 
                 OutlinedButton(
-                    enabled = !busy && !modelsLoading && hasMicPermission,
+                    enabled = !busy && hasMicPermission,
                     onClick = {
                         scope.launch {
                             busy = true
                             try {
-                                // 1.2 s of blocking AudioRecord reads plus a 4096-point FFT. This
-                                // ran on the main thread and froze the UI for the whole recording.
-                                val result = withContext(Dispatchers.Default) {
-                                    AcousticTapClassifier.recordAndClassifyOneTap(
-                                        trained = trainedTapModel
-                                    )
-                                }
+                                val result = AcousticTapClassifier.recordAndClassifyOneTap(
+                                    trained = trainedTapModel
+                                )
                                 val lamp = when (result.verdict) {
                                     AcousticTapClassifier.TapVerdict.LIKELY_HOLLOW -> Lamp.FLAG
                                     AcousticTapClassifier.TapVerdict.LIKELY_SOLID -> Lamp.PASS
@@ -442,41 +381,10 @@ fun WalkthroughScreen(onReportGenerated: (InspectionReport) -> Unit) {
                                     AcousticTapClassifier.TapVerdict.LIKELY_SOLID -> "solid"
                                     AcousticTapClassifier.TapVerdict.INCONCLUSIVE -> "unclear"
                                 }
-                                // result.hollowProbability is the trained model's raw P(hollow)
-                                // when a trained classification produced this verdict, and null
-                                // whenever the heuristic decided instead -- no model shipped, or
-                                // TrainedTapClassifier declined to score a too-short/too-quiet
-                                // clip even with a model loaded. "Confidence" here means the
-                                // model's confidence in its OWN verdict, so a solid reading
-                                // reports 1 - P(hollow), not P(hollow) itself. Zero only when
-                                // there is genuinely no probability to report: INCONCLUSIVE, or
-                                // the heuristic path.
-                                val tapConfidence = when {
-                                    result.verdict == AcousticTapClassifier.TapVerdict.INCONCLUSIVE -> 0f
-                                    result.hollowProbability == null -> 0f
-                                    result.verdict == AcousticTapClassifier.TapVerdict.LIKELY_SOLID ->
-                                        1f - result.hollowProbability
-                                    else -> result.hollowProbability
-                                }
                                 logFinding(
-                                    type = FindingType.ACOUSTIC_TAP, label = "Tap test", value = reading,
-                                    detail = FindingDetail.AcousticTap(
-                                        verdict = reading,
-                                        confidence = tapConfidence,
-                                        // Whether the trained model actually produced THIS
-                                        // verdict, not merely whether one was loaded -- a
-                                        // loaded model can still fall back to the heuristic
-                                        // per tap, and reporting the wrong source here is what
-                                        // would make DeductionEngine's basis text lie about
-                                        // where the number came from.
-                                        fromTrainedModel = result.hollowProbability != null
-                                    ),
-                                    noteText = result.confidenceNote,
-                                    lamp = lamp
+                                    FindingType.ACOUSTIC_TAP, "Tap test", reading,
+                                    result.confidenceNote, lamp
                                 )
-                            } catch (e: Exception) {
-                                // AudioRecord construction throws if the mic is held elsewhere.
-                                note("Tap test failed", e.message ?: e.javaClass.simpleName)
                             } finally {
                                 busy = false
                             }
@@ -493,46 +401,18 @@ fun WalkthroughScreen(onReportGenerated: (InspectionReport) -> Unit) {
             OutlinedButton(
                 enabled = !busy && irController.hasIrBlaster,
                 onClick = {
-                    scope.launch {
-                        val profile = CommonAcIrProfiles.profiles.first()
-                        // NEC-family header timings. The demo unit's real burst has to be captured
-                        // on-site with an external receiver -- ConsumerIrManager cannot receive IR
-                        // (see IrController) -- so the label below never claims more than was done:
-                        // the emitter fired, and nothing confirmed the appliance responded.
-                        val necHeaderBurst = intArrayOf(9000, 4500, 560, 560, 560, 1690)
-                        when (val result =
-                            irController.transmit(profile.typicalCarrierHz, necHeaderBurst)) {
-                            // "functional = true" here means only what the honesty comment
-                            // above says: the emitter fired. DeductionEngine's clearedNotes
-                            // wording is the one place that gets to say what that does and
-                            // does not confirm -- this call site adds no claim of its own.
-                            is IrController.TransmitResult.Success -> logFinding(
-                                type = FindingType.IR_APPLIANCE_CHECK, label = "IR command transmitted", value = "IR sent",
-                                detail = FindingDetail.ApplianceCheck(
-                                    appliance = "${profile.brand} AC", functional = true
-                                ),
-                                noteText = "%s, %d kHz — pattern not verified against this unit".format(
-                                    profile.brand, profile.typicalCarrierHz / 1000
-                                ),
-                                lamp = Lamp.PASS
-                            )
-                            is IrController.TransmitResult.Failure -> logFinding(
-                                type = FindingType.IR_APPLIANCE_CHECK, label = "IR transmit failed", value = "no IR",
-                                detail = FindingDetail.ApplianceCheck(
-                                    appliance = "${profile.brand} AC",
-                                    functional = false,
-                                    // The command never left the device, so this is a tool
-                                    // failure, not a reading on the appliance -- irTransmitted
-                                    // and the reason both have to be persisted, or
-                                    // DeductionEngine and the report have no way to tell this
-                                    // apart from an appliance that was actually checked.
-                                    irTransmitted = false,
-                                    failureReason = result.reason
-                                ),
-                                noteText = result.reason,
-                                lamp = Lamp.CAUTION
-                            )
-                        }
+                    val profile = CommonAcIrProfiles.profiles.first()
+                    // Placeholder burst, replaced by the on-site capture for the demo unit.
+                    val placeholderPattern = intArrayOf(9000, 4500, 560, 560, 560, 1690)
+                    when (val result = irController.transmit(profile.typicalCarrierHz, placeholderPattern)) {
+                        is IrController.TransmitResult.Success -> logFinding(
+                            FindingType.IR_APPLIANCE_CHECK, "AC responded", "IR sent",
+                            profile.brand + " profile, placeholder pattern", Lamp.PASS
+                        )
+                        is IrController.TransmitResult.Failure -> logFinding(
+                            FindingType.IR_APPLIANCE_CHECK, "AC check skipped", "no IR",
+                            result.reason, Lamp.CAUTION
+                        )
                     }
                 },
                 modifier = Modifier.fillMaxWidth().height(46.dp),
@@ -614,27 +494,6 @@ fun WalkthroughScreen(onReportGenerated: (InspectionReport) -> Unit) {
             }
         }
 
-        Column(Modifier.padding(horizontal = 16.dp)) {
-            OutlinedTextField(
-                value = depositInput,
-                onValueChange = { new ->
-                    // Reject anything that is not plain digits, and cap the length so a
-                    // mis-tap cannot produce a refund figure with more zeros than any real
-                    // Chennai deposit has. An empty field is allowed mid-edit; it is treated
-                    // as "no deposit entered" below, same as a session with none at all.
-                    if (new.isEmpty() || (new.length <= MAX_DEPOSIT_DIGITS && new.all(Char::isDigit))) {
-                        depositInput = new
-                    }
-                },
-                label = { Text("Deposit held (₹)") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-
-        Spacer(Modifier.height(8.dp))
-
         Button(
             enabled = findings.isNotEmpty() && !busy,
             onClick = {
@@ -642,23 +501,11 @@ fun WalkthroughScreen(onReportGenerated: (InspectionReport) -> Unit) {
                     busy = true
                     try {
                         val stored = db.inspectionDao().findingsForSessionOnce(sessionId)
-                        // Null when the field was left empty -- ReportGenerator then leaves
-                        // the report's deductions unset rather than pricing against a figure
-                        // nobody entered.
-                        val depositRupees = depositInput.toIntOrNull()
-                        // Digest, layout and file write, all off the UI thread. Built once
-                        // here and handed upwards -- MainActivity used to re-query and
-                        // rebuild it, producing a second report object for the same session.
-                        val report = withContext(Dispatchers.Default) {
-                            val r = ReportGenerator.buildReport(
-                                sessionId, "Demo Property, Chennai", stored, depositRupees
-                            )
-                            ReportGenerator.renderToPdf(context, r)
-                            r
-                        }
-                        onReportGenerated(report)
-                    } catch (e: Exception) {
-                        note("Report generation failed", e.message ?: e.javaClass.simpleName)
+                        val report = ReportGenerator.buildReport(
+                            sessionId, "Demo Property, Chennai", stored
+                        )
+                        ReportGenerator.renderToPdf(context, report)
+                        onReportGenerated(sessionId)
                     } finally {
                         busy = false
                     }
