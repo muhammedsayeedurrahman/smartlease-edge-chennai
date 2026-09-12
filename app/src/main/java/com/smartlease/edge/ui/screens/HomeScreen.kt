@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.smartlease.edge.data.SessionType
 import com.smartlease.edge.ui.components.Lamp
 import com.smartlease.edge.ui.components.Panel
 import com.smartlease.edge.ui.components.StatusLamp
@@ -32,7 +33,7 @@ import com.smartlease.edge.ui.theme.ReadoutValue
 
 @Composable
 fun HomeScreen(
-    onStartWalkthrough: () -> Unit,
+    onStartWalkthrough: (SessionType) -> Unit,
     onOpenSelfTest: () -> Unit,
     onOpenTapCapture: (() -> Unit)? = null
 ) {
@@ -90,11 +91,26 @@ fun HomeScreen(
 
         Spacer(Modifier.height(28.dp))
 
+        // Move-in documents the baseline condition; move-out is diffed against it, so a
+        // defect already on record at move-in is never billed twice. Two entry points
+        // rather than a toggle inside the walkthrough because which one this is matters
+        // before a single finding is captured, not after.
         Button(
-            onClick = onStartWalkthrough,
+            onClick = { onStartWalkthrough(SessionType.MOVE_IN) },
             modifier = Modifier.fillMaxWidth().height(52.dp)
         ) {
-            Text("Start walkthrough", style = MaterialTheme.typography.titleMedium)
+            Text("Start move-in inspection", style = MaterialTheme.typography.titleMedium)
+        }
+
+        Spacer(Modifier.height(10.dp))
+        OutlinedButton(
+            onClick = { onStartWalkthrough(SessionType.MOVE_OUT) },
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+            colors = ButtonDefaults.outlinedButtonColors(
+                contentColor = MaterialTheme.colorScheme.onBackground
+            )
+        ) {
+            Text("Start move-out inspection", style = MaterialTheme.typography.titleMedium)
         }
 
         // No "past reports" entry: there is no session-list query, so the button only ever

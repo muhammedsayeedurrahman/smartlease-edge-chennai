@@ -16,6 +16,11 @@ data class InspectionEntity(
     val label: String,
     val detailJson: String,
     val severity: Severity,
+    // Denormalized onto every row rather than a separate sessions table -- this schema has
+    // never had one, and a single-property demo doesn't need the join. Lets a move-out
+    // session look up "the most recent move-in session for this same property" directly.
+    val sessionType: SessionType = SessionType.MOVE_OUT,
+    val propertyLabel: String = "",
     val latitude: Double? = null,
     val longitude: Double? = null
 )
@@ -32,4 +37,10 @@ enum class Severity {
     INFO,
     NOTABLE,
     STOP_ESCALATE
+}
+
+/** Which side of a lease this session documents -- move-out findings get diffed against it. */
+enum class SessionType {
+    MOVE_IN,
+    MOVE_OUT
 }

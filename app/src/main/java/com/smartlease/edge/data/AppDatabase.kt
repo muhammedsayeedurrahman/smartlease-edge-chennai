@@ -5,7 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [InspectionEntity::class], version = 1, exportSchema = false)
+@Database(entities = [InspectionEntity::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun inspectionDao(): InspectionDao
 
@@ -19,7 +19,14 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "smartlease.db"
-                ).build().also { instance = it }
+                )
+                    // v1 -> v2 added sessionType/propertyLabel (move-in/move-out baseline
+                    // diffing). No migration path exists yet for whatever test rows are on a
+                    // device from before this change -- there is no real tenant data at stake
+                    // this early, so this drops old rows rather than leaving the app unable
+                    // to open its own database on next launch.
+                    .fallbackToDestructiveMigration(dropAllTables = true)
+                    .build().also { instance = it }
             }
     }
 }

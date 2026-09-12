@@ -31,6 +31,7 @@ import com.smartlease.edge.camera.CameraController
 import com.smartlease.edge.data.AppDatabase
 import com.smartlease.edge.data.FindingType
 import com.smartlease.edge.data.InspectionEntity
+import com.smartlease.edge.data.SessionType
 import com.smartlease.edge.data.Severity
 import com.smartlease.edge.deduction.FindingDetail
 import com.smartlease.edge.ir.CommonAcIrProfiles
@@ -57,6 +58,13 @@ import java.util.UUID
 /** Pre-filled deposit figure -- the demo's own stated amount, not a claim about any real lease. */
 private const val DEFAULT_DEPOSIT_RUPEES = 90_000
 
+/**
+ * One hardcoded property, matched between a move-in and its later move-out session. A real
+ * multi-property build would need an actual property picker/id; this app documents one
+ * demo lease, so the label doubles as that id.
+ */
+private const val PROPERTY_LABEL = "Demo Property, Chennai"
+
 /** Long enough for any real Chennai deposit, short enough that a mis-tap cannot run off screen. */
 private const val MAX_DEPOSIT_DIGITS = 8
 
@@ -77,7 +85,7 @@ private data class LoggedFinding(
  * inference, the tap recording and the PDF render are dispatched to Dispatchers.Default.
  */
 @Composable
-fun WalkthroughScreen(onReportGenerated: (InspectionReport) -> Unit) {
+fun WalkthroughScreen(sessionType: SessionType, onReportGenerated: (InspectionReport) -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
@@ -174,7 +182,9 @@ fun WalkthroughScreen(onReportGenerated: (InspectionReport) -> Unit) {
                     // actually found. This is the one line that makes the deposit arithmetic
                     // possible at all.
                     detailJson = detail.toJson(),
-                    severity = severity
+                    severity = severity,
+                    sessionType = sessionType,
+                    propertyLabel = PROPERTY_LABEL
                 )
             )
         } catch (e: Exception) {
@@ -247,7 +257,7 @@ fun WalkthroughScreen(onReportGenerated: (InspectionReport) -> Unit) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                "Inspection",
+                if (sessionType == SessionType.MOVE_IN) "Move-in inspection" else "Move-out inspection",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onBackground
             )
@@ -760,12 +770,27 @@ fun WalkthroughScreen(onReportGenerated: (InspectionReport) -> Unit) {
                         // the report's deductions unset rather than pricing against a figure
                         // nobody entered.
                         val depositRupees = depositInput.toIntOrNull()
+                        // A move-out session prices only what's new since move-in: look up the
+                        // most recent move-in session for this same property, if one exists on
+                        // this device, and pass its finding keys through so DeductionEngine
+                        // treats an already-there defect as "present at move-in", never billed.
+                        val baselineKeys = if (sessionType == SessionType.MOVE_OUT) {
+                            val baselineSessionId = db.inspectionDao()
+                                .mostRecentSessionId(PROPERTY_LABEL, SessionType.MOVE_IN)
+                            baselineSessionId
+                                ?.let { db.inspectionDao().findingsForSessionOnce(it) }
+                                ?.map { "${it.findingType}:${it.label}" }
+                                ?.toSet()
+                                ?: emptySet()
+                        } else {
+                            emptySet()
+                        }
                         // Digest, layout and file write, all off the UI thread. Built once
                         // here and handed upwards -- MainActivity used to re-query and
                         // rebuild it, producing a second report object for the same session.
                         val report = withContext(Dispatchers.Default) {
                             val r = ReportGenerator.buildReport(
-                                sessionId, "Demo Property, Chennai", stored, depositRupees
+                                sessionId, PROPERTY_LABEL, stored, depositRupees, baselineKeys
                             )
                             ReportGenerator.renderToPdf(context, r)
                             r

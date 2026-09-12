@@ -41,12 +41,16 @@ object ReportGenerator {
      * @param depositRupees null for a session with no deposit to track (e.g. a maintenance
      * walkthrough) -- the report is still produced, just with [InspectionReport.deductions]
      * left null rather than a balance sheet built from a figure nobody entered.
+     * @param baselineKeys findings already on record from this property's move-in session --
+     * see [com.smartlease.edge.deduction.DeductionEngine.summarise]. Empty for a move-in
+     * session itself, or a move-out with no baseline found.
      */
     fun buildReport(
         sessionId: String,
         propertyLabel: String,
         findings: List<InspectionEntity>,
-        depositRupees: Int? = null
+        depositRupees: Int? = null,
+        baselineKeys: Set<String> = emptySet()
     ): InspectionReport {
         val sections = findings.groupBy { it.findingType }.map { (type, items) ->
             ReportSection(
@@ -70,7 +74,7 @@ object ReportGenerator {
             overallVerdict = verdict,
             findingsSha256 = FindingsDigest.sha256Hex(sessionId, findings),
             findingCount = findings.size,
-            deductions = depositRupees?.let { DeductionEngine.summarise(it, findings) }
+            deductions = depositRupees?.let { DeductionEngine.summarise(it, findings, baselineKeys) }
         )
     }
 

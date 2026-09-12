@@ -20,11 +20,23 @@ object DeductionEngine {
     /** Below this confidence a trained detection is flagged for review, not priced. */
     const val PRICING_CONFIDENCE_FLOOR = 0.60f
 
-    fun summarise(depositRupees: Int, findings: List<InspectionEntity>): DeductionSummary {
+    /**
+     * @param baselineKeys keys (see [keyFor]) of findings already recorded at this same
+     * property's move-in session. A move-out finding matching one of these was present
+     * before this tenancy started, so it is never priced regardless of confidence -- the
+     * statutory itemised-deduction requirement is "what changed", not "what's damaged in
+     * general". Empty for a move-in session, or a move-out with no move-in baseline on file.
+     */
+    fun summarise(
+        depositRupees: Int,
+        findings: List<InspectionEntity>,
+        baselineKeys: Set<String> = emptySet()
+    ): DeductionSummary {
         val details = findings.map { it to FindingDetail.fromJson(it.detailJson) }
 
         val lines = buildList {
             details.forEach { (entity, detail) ->
+                if (keyFor(entity, detail) in baselineKeys) return@forEach
                 when (detail) {
                     is FindingDetail.VisualDefect -> visualLine(detail)?.let { add(it) }
                     is FindingDetail.AcousticTap -> tapLine(detail)?.let { add(it) }
@@ -38,7 +50,11 @@ object DeductionEngine {
         }
 
         val cleared = buildList {
-            details.forEach { (_, detail) ->
+            details.forEach { (entity, detail) ->
+                if (keyFor(entity, detail) in baselineKeys) {
+                    add("${entity.label}: present at move-in — not deductible.")
+                    return@forEach
+                }
                 when (detail) {
                     is FindingDetail.VisualDefect ->
                         if (!isPriceable(detail)) add(reviewNote(detail))
@@ -66,6 +82,16 @@ object DeductionEngine {
             clearedNotes = cleared
         )
     }
+
+    /**
+     * A finding's identity for baseline matching: finding type plus its exact label (which,
+     * for the 360 auto-capture flow, already includes which wall). Exact string match on
+     * purpose -- under-matching (a real pre-existing defect gets billed because its label
+     * drifted between sessions) is the safer failure here than over-matching (a genuinely
+     * new defect gets waved through because it loosely resembles an old one).
+     */
+    private fun keyFor(entity: InspectionEntity, detail: FindingDetail?): String =
+        "${entity.findingType}:${entity.label}"
 
     private const val HOLLOW = "hollow"
 
