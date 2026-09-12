@@ -19,8 +19,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.smartlease.edge.ui.components.Lamp
@@ -29,8 +31,22 @@ import com.smartlease.edge.ui.components.StatusLamp
 import com.smartlease.edge.ui.theme.ReadoutValue
 
 @Composable
-fun HomeScreen(onStartWalkthrough: () -> Unit, onViewReports: () -> Unit) {
+fun HomeScreen(
+    onStartWalkthrough: () -> Unit,
+    onOpenSelfTest: () -> Unit,
+    onOpenTapCapture: (() -> Unit)? = null
+) {
     val insets = WindowInsets.systemBars.asPaddingValues()
+    val context = LocalContext.current
+
+    // Which models actually shipped in this APK. Listing the assets directory is cheap —
+    // deliberately not loading them here, because loading the segmentation model is a
+    // 13.7 MB copy plus a TorchScript parse and that belongs off the home screen.
+    val assets = remember {
+        runCatching { context.assets.list("")?.toSet() ?: emptySet() }.getOrDefault(emptySet())
+    }
+    val hasVisionModel = "yolov8n_seg.ptl" in assets
+    val hasTapModel = "acoustic_tap_model.json" in assets
 
     Column(
         modifier = Modifier
@@ -80,15 +96,33 @@ fun HomeScreen(onStartWalkthrough: () -> Unit, onViewReports: () -> Unit) {
         ) {
             Text("Start walkthrough", style = MaterialTheme.typography.titleMedium)
         }
+
+        // No "past reports" entry: there is no session-list query, so the button only ever
+        // reached an empty report screen. A missing feature costs nothing; a broken one a
+        // judge taps costs trust.
         Spacer(Modifier.height(10.dp))
         OutlinedButton(
-            onClick = onViewReports,
+            onClick = onOpenSelfTest,
             modifier = Modifier.fillMaxWidth().height(52.dp),
             colors = ButtonDefaults.outlinedButtonColors(
                 contentColor = MaterialTheme.colorScheme.onBackground
             )
         ) {
-            Text("Past reports", style = MaterialTheme.typography.titleMedium)
+            Text("Device & model check", style = MaterialTheme.typography.titleMedium)
+        }
+
+        // Debug builds only: MainActivity passes null in release, so this never renders.
+        onOpenTapCapture?.let { open ->
+            Spacer(Modifier.height(10.dp))
+            OutlinedButton(
+                onClick = open,
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.onBackground
+                )
+            ) {
+                Text("Tap capture (debug)", style = MaterialTheme.typography.titleMedium)
+            }
         }
 
         Spacer(Modifier.height(32.dp))
@@ -96,23 +130,39 @@ fun HomeScreen(onStartWalkthrough: () -> Unit, onViewReports: () -> Unit) {
         Panel(Modifier.fillMaxWidth()) {
             Column {
                 Text(
-                    "What runs on this device",
+                    "What runs in this build",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(Modifier.height(14.dp))
 
-                CapabilityLine(
-                    Lamp.PASS, "Defect segmentation",
-                    "YOLOv8n-Seg, 4 classes", "3.3M params"
-                )
-                CapabilityLine(
-                    Lamp.PASS, "Acoustic tap test",
-                    "Trained classifier, cross-validated", "80%"
-                )
+                // Read from the APK's own assets rather than asserted, so this panel cannot
+                // claim a model that did not ship.
+                if (hasVisionModel) {
+                    CapabilityLine(
+                        Lamp.PASS, "Defect segmentation",
+                        "YOLOv8n-Seg, 4 classes, CPU via PyTorch Lite", "3.3M params"
+                    )
+                } else {
+                    CapabilityLine(
+                        Lamp.CAUTION, "Defect segmentation",
+                        "No model in this build — colour/contrast heuristic only", null
+                    )
+                }
+                if (hasTapModel) {
+                    CapabilityLine(
+                        Lamp.PASS, "Acoustic tap test",
+                        "36-feature logistic regression, cross-validated", "80%"
+                    )
+                } else {
+                    CapabilityLine(
+                        Lamp.CAUTION, "Acoustic tap test",
+                        "No trained model in this build — decay-time heuristic", null
+                    )
+                }
                 CapabilityLine(
                     Lamp.PASS, "Camera, tilt, OCR, report",
-                    "Signed PDF written locally", null
+                    "SHA-256 digest printed on a PDF written locally", null
                 )
 
                 Spacer(Modifier.height(14.dp))
@@ -137,6 +187,14 @@ fun HomeScreen(onStartWalkthrough: () -> Unit, onViewReports: () -> Unit) {
                 CapabilityLine(
                     Lamp.CAUTION, "Segmentation runs on CPU",
                     "Hexagon NPU path not yet wired", null
+                )
+                CapabilityLine(
+                    Lamp.CAUTION, "Defect area is relative",
+                    "A share of the frame, not a physical measurement", null
+                )
+                CapabilityLine(
+                    Lamp.CAUTION, "IR is transmit-only",
+                    "Android cannot receive IR — a trigger is logged as sent, not verified", null
                 )
             }
         }

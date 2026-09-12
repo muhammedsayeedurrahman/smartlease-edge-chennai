@@ -56,7 +56,7 @@ SmartLeaseEdge targets the gap: offline-capable, tests appliance function (not j
 └─────────────────────────────────────────────────────────────┘
                            ↓
 ┌─────────────────────────────────────────────────────────────┐
-│  ON-DEVICE PROCESSING (Snapdragon 8 Elite Gen 5 Hexagon NPU)│
+│  ON-DEVICE PROCESSING (host CPU — see Current Status)       │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
 │  │ AR Alignment│  │Vision Seg.  │  │Acoustic Test│         │
 │  │(SensorMgr + │  │(YOLOv8-Seg) │  │(FFT + ML)   │         │
@@ -70,12 +70,12 @@ SmartLeaseEdge targets the gap: offline-capable, tests appliance function (not j
 └─────────────────────────────────────────────────────────────┘
                            ↓
 ┌─────────────────────────────────────────────────────────────┐
-│  REPORT LAYER (Qualcomm GenieX + Llama-3.2)                │
+│  REPORT LAYER (rule-based synthesis, host CPU)             │
 │  Plain-language repair/cost breakdown                      │
 └─────────────────────────────────────────────────────────────┘
                            ↓
 ┌─────────────────────────────────────────────────────────────┐
-│  OUTPUT: Signed, timestamped local PDF — 100% offline      │
+│  OUTPUT: Timestamped local PDF + SHA-256 — 100% offline     │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -87,57 +87,64 @@ Specific hardware features mapped to implementation requirements:
 
 | Hardware Component | Specification | Implementation Use Case |
 |--------------------|---------------|------------------------|
-| Snapdragon 8 Elite Gen 5 Hexagon NPU | 37% faster AI inference vs. prior generation | Runs GenieX Llama-3.2 (report generation) + YOLOv8-Seg (vision segmentation) on-device |
-| 8K Vapor Chamber Cooling | Sustained thermal management | Maintains consistent NPU performance during 30-minute continuous walkthrough without thermal throttling |
-| Triple 50MP Camera (Sony IMX921 OIS, ultrawide, periscope) | OIS, multi-focal lengths | OIS: Stabilizes AR overlay alignment; Ultrawide: Full-wall capture; Telephoto: Inspects small defects from distance |
-| 6000-nit 2K LTPO Display | High peak brightness | Maintains AR overlay visibility in bright outdoor/sunlit conditions during actual inspections |
+| Snapdragon 8 Elite Gen 5 Hexagon NPU | 37% faster AI inference vs. prior generation | **Not currently used.** All three models run on the CPU. The ExecuTorch INT8 `.pte` is compiled and in the repo (`ml/YOLOV8/qnn_android_bundle/`) but is not wired into the APK — see Current Status below |
+| 8K Vapor Chamber Cooling | Sustained thermal management | Sustained CPU inference across a long walkthrough without throttling |
+| Triple 50MP Camera (Sony IMX921 OIS, ultrawide, periscope) | OIS, multi-focal lengths | OIS steadies handheld capture. The app binds the default rear camera via CameraX; it does not currently select ultrawide or telephoto |
+| 6000-nit 2K LTPO Display | High peak brightness | Keeps the live camera preview usable in bright sunlit rooms. *(No AR overlay is rendered — pose delta is shown as text.)* |
 | 7000mAh Battery + 100W Charging | Extended capacity, fast charging | Supports 20–40 minute walkthrough; rapid recharge between hackathon evaluation rounds |
-| Sensing Hub | Low-power always-on sensor processing | Continuous acoustic event detection without main NPU power draw |
-| Dual Stereo Speakers | Enhanced audio output (120% louder) | Audible acoustic tap confirmation for demo presentation |
+| Stereo mics | 44.1 kHz PCM via `AudioRecord` | Captures the knuckle-tap transient on a button press. **Not** the Sensing Hub: its always-on audio path has no third-party API |
+| 2K LTPO display | High refresh, high brightness | Keeps the camera preview and findings log legible in a sunlit flat. *(No audio confirmation tone is implemented.)* |
 | Vivo Office Kit | Screen mirroring, remote control | Live screen projection for evaluation; phone-only development workflow |
 
-This mapping addresses the common gap where teams claim generic "NPU usage" without specifying which hardware features solve which technical requirements.
+The honest summary of this table: **the IR blaster is the only component here that a commodity phone does not have and that this app actually uses.** Everything else is camera, mic and sensors. The NPU is headroom we have not taken up.
 
 ---
 
-## 🚀 Current Status (Day 2 of 12) — Honest MVP Assessment
+## 🚀 Current Status (Sep 12, judging eve) — Honest MVP Assessment
 
-### ✅ What's Real and Working Right Now
+Audited against the source on 2026-09-12; every claim below was checked against code, not
+against an earlier version of this file. See `AUDIT_CLAIMS.md` and `AUDIT_GAPS.md` at the
+workspace root for the full ledger, and `METRICS.md` for the first recorded vision metrics.
 
-We believe in honest execution, not vaporware. Here's what actually works today vs. what's coming:
+### ✅ Real and running
 
 | Subsystem | Implementation | Status |
 |-----------|----------------|--------|
-| **Camera capture + preview** | `camera/CameraController.kt` | ✅ Real CameraX wrapper, binds to device rear camera |
-| **AR baseline alignment** | `camera/ArAlignmentTracker.kt` | ✅ Real SensorManager rotation-vector tracking, pitch/roll delta from baseline |
-| **OCR** | `ocr/OcrEngine.kt` | ✅ Real ML Kit on-device text recognition, fully offline |
-| **IR transmit** | `ir/IrController.kt` | ✅ Real ConsumerIrManager wrapper — transmits IR patterns |
-| **Acoustic tap analysis** | `acoustic/AcousticTapClassifier.kt` + `Fft.kt` | ✅ Real AudioRecord capture, real FFT, amplitude/decay heuristic |
-| **Safety gate** | `safety/SafetyGate.kt` | ✅ Real deterministic keyword-based rule engine |
-| **PDF report generation** | `report/ReportGenerator.kt` | ✅ Real offline PDF rendering (Android PdfDocument API) |
-| **Local storage** | `data/` | ✅ Real Room database, backup-excluded by design |
+| **Camera capture + preview** | `camera/CameraController.kt` | ✅ CameraX, default rear camera |
+| **Pose baseline** | `camera/ArAlignmentTracker.kt` | ✅ Rotation-vector pitch/roll delta, ±4° tolerance. In memory for the session — **not** a stored move-in reference, and no photo is kept |
+| **OCR** | `ocr/OcrEngine.kt` | ✅ ML Kit bundled Latin recognizer, genuinely offline |
+| **IR transmit** | `ir/IrController.kt` | ✅ Real `ConsumerIrManager`. Transmit only — Android cannot receive IR, so a trigger is logged as *sent*, never as *verified* |
+| **Vision segmentation** | `vision/YoloSegDefectSegmenter.kt` | ✅ 4-class YOLOv8n-Seg (`yolov8n_seg.ptl`), **on the CPU** via PyTorch Lite. Falls back to a labelled colour heuristic if the model fails a load-time contract probe |
+| **Acoustic tap** | `acoustic/` | ✅ 36-feature logistic regression, CPU. Reported with its grouped cross-validated accuracy and 95% CI |
+| **Safety gate** | `safety/SafetyGate.kt` | ✅ Deterministic keyword rules, 8 unit tests. Can only escalate, never suppress |
+| **Report** | `report/ReportGenerator.kt` | ✅ Offline `PdfDocument`, with a **SHA-256 of exactly its findings on every page** |
+| **Share** | `ui/screens/ReportScreen.kt` | ✅ `FileProvider` + share sheet, scoped to `filesDir/reports/` |
+| **Storage** | `data/` | ✅ Room, local only. `allowBackup=false`, every backup domain excluded |
 
-**Build verification:**
-```bash
-./gradlew :app:assembleDebug
-# Output: app/build/outputs/apk/debug/app-debug.apk (~56MB)
-# Installs and runs on device today
-```
+**Build:** `./gradlew :app:assembleDebug` — arm64-v8a only, ~14 MB of assets.
 
-### 🔧 Honestly Stubbed — What We're Training Before the Event
+### ❌ What is claimed nowhere, because it does not exist
 
-| Subsystem | Why Stubbed | Our 12-Day Plan |
-|-----------|-------------|----------------|
-| **Vision defect segmenter** | Real version needs YOLOv8-Seg training on wall damage dataset + ExecuTorch export to Hexagon NPU | **Days 3–8:** Train on 200–500 collected images, export to `.pte` format, test NPU delegate |
-| **GenieX report narrative** | Real version needs Qualcomm GenieX SDK integration for on-device Llama-3.2 | **Days 9–10:** Wire GenieX SDK into `ReportGenerator.kt`, test offline synthesis |
-| **Real AC IR patterns** | Can only be captured from the actual on-stage demo AC unit | **Day 12 (on-site):** Live IR capture from venue AC — the one unavoidable live step |
+| | Why it matters |
+|---|---|
+| **Hexagon NPU / HTP execution** | The only inference dependency is `org.pytorch:pytorch_android_lite:1.13.0`, a CPU interpreter. The ExecuTorch INT8 `.pte` is compiled and in the repo (`ml/YOLOV8/qnn_android_bundle/`) but is **not in the APK**, was lowered for **SM8650 (Snapdragon 8 Gen 3)**, and is missing the `libQnnHtpV##Skel.so` its own build script lists as required |
+| **On-device LLM / GenieX / Llama 3.2** | `synthesizeNarrative()` is string templating. No LLM dependency exists |
+| **Dual-party signature** | Not implemented. The SHA-256 proves the findings are unaltered; it does **not** identify who recorded them, and the timestamp is `System.currentTimeMillis()`, which a user can move |
+| **Pinhole area in sq ft** | The app reports mask coverage × a hardcoded 48″×36″ frame. There is no focal length and no depth on device, so the number does not change with distance. The real formula lives in `ml/vision/predict.py` and never runs on the phone |
+| **Sensing Hub always-on capture** | No third-party API exists for it. Capture is `AudioRecord` on a button press |
+| **Move-in ↔ move-out diff** | No stored baseline, no photo retention, no phone-to-phone transport, no diff engine, no wear-and-tear rules, no fixture inventory. This is a **single-session condition record**, and that is what it should be pitched as |
 
-**Placeholder implementations today:**
-- `HeuristicDefectSegmenter`: Basic color/contrast region flagging (explicitly marked `isTrainedModel = false`)
-- `synthesizeNarrative()`: Templated text generation (swaps to GenieX once wired)
-- `CommonAcIrProfiles`: Carrier frequencies only (real patterns loaded Day 12)
+### ⚠️ Known weaknesses we will raise before a judge does
 
-**Why we're honest about this:** Under judge Q&A, claiming something works when it doesn't kills credibility. We'd rather show a clear de-risking plan that proves we know what's hard and have a schedule to solve it.
+- **Vision mAP50 (mask) is 0.287** on our test split, and that figure is inflated: source
+  video frames appear on both sides of every split (`DJI_0017`: 50 train / 5 valid / 3 test).
+  `stain_mould` is effectively broken at 0.065. Full numbers in `METRICS.md`.
+- **Zero hard negatives.** Not one of the 2,106 training images is free of defects, so the
+  model has never seen a clean wall and its false-positive rate is unmeasured.
+- **The acoustic model is trained on 15 taps from 8 recordings.** 80% grouped-LOGO accuracy,
+  95% CI 62–96%, against a 53% majority baseline. Honest, and not yet a result.
+- **No on-device latency measurement exists.** 21.8 ms/image on a desktop CPU is a bound,
+  not an app number.
 
 ---
 
@@ -203,14 +210,14 @@ python tools/validate_training_data.py
 
 ## 🗓️ 12-Day Hackathon Prep Timeline
 
-| Days | Phase | Focus |
-|------|-------|-------|
-| **1–2** (Sep 1–2) | Data collection | Record tap samples, collect wall damage images |
-| **3–5** (Sep 3–5) | Model training | Train acoustic classifier + YOLOv8-Seg vision model |
-| **6–8** (Sep 6–8) | Export & hardware test | Export to ExecuTorch, test Hexagon NPU delegate |
-| **9–10** (Sep 9–10) | Integration | Wire all subsystems, GenieX report generation |
-| **11** (Sep 11) | Rehearsal | Full end-to-end demo run, 3+ times, timed |
-| **12** (Sep 12) | Event check-in | Capture real AC IR pattern on-site |
+| Days | Planned | What actually happened |
+|------|---------|------------------------|
+| **1–2** | Data collection | 8 tap recordings (15 taps). Vision data taken from 4 public Roboflow datasets instead of collected |
+| **3–5** | Model training | ✅ Both models trained. Acoustic: grouped-LOGO evaluated. Vision: trained, **not** evaluated until Sep 12 — see `METRICS.md` |
+| **6–8** | Export & NPU test | ⚠️ ExecuTorch INT8 `.pte` exported and in the repo. **The HTP test never happened and the delegate is not in the APK** |
+| **9–10** | GenieX report generation | ❌ Not started. The narrative is rule-based templating |
+| **11** | Rehearsal | — |
+| **12** | Capture real AC IR pattern on-site | Outstanding. The shipped burst is an unverified NEC-family header |
 
 ---
 
@@ -218,7 +225,7 @@ python tools/validate_training_data.py
 
 1. **0:00–0:45** — Problem hook: Deposit disputes as India's top landlord-tenant conflict
 2. **0:45–1:45** — Live offline showcase: Airplane mode → AR alignment → acoustic tap → IR AC trigger
-3. **1:45–2:30** — Report synthesis: GenieX generates offline report live on-device
+3. **1:45–2:30** — Report synthesis: findings render to a PDF on-device, carrying a SHA-256 of exactly those findings on every page; share sheet to the laptop
 4. **2:30–3:00** — Competitive close: Name the gap vs. NoBroker/zInspector/RentCheck
 
 ---
@@ -263,7 +270,7 @@ python tools/validate_training_data.py
 
 | Role | Pre-Event Focus (Days 1–11) | Event-Day Focus (Sep 12–13) |
 |------|----------------------------|----------------------------|
-| **Member 1 — AI/NPU Engineer** | Train & export models (acoustic classifier, YOLOv8-Seg vision); GenieX SDK integration | Integrate pre-tested models into live app; tune to venue lighting/acoustics |
+| **Member 1 — AI Engineer** | Train & export models (acoustic classifier, YOLOv8-Seg vision); ExecuTorch INT8 lowering | Integrate models into the live app; tune to venue lighting/acoustics |
 | **Member 2 — Android/Hardware Lead** | Build AR overlay UI, IR transmit pipeline, camera features; pre-capture AC IR codes | Live on-site IR capture from demo AC unit; Vivo Office Kit Red Light build sessions |
 | **Member 3 — Research/Demo/Testing** | Data collection assist, testing, demo script, props, pitch prep | Rehearsed demo delivery (3-min timed); handle judge Q&A |
 
@@ -301,7 +308,7 @@ This project was built for the **iQOO Hackathon 2026 — Chennai City Battle** (
 ## 🙏 Acknowledgments
 
 - **iQOO India** for the hackathon platform and iQOO 15 hardware access
-- **Qualcomm** for the GenieX on-device LLM SDK
+- **Roboflow Universe** contributors for the four CC BY 4.0 defect datasets: `infrastructure-monitoring`, `structural-defects`, `building-anomalies`, `concrete-defects`
 - **Roboflow / Kaggle** for public wall damage datasets
 - **Chennai developer community** for battle-testing the offline-first approach
 

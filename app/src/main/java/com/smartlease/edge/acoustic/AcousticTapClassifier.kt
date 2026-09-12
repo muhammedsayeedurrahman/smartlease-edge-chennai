@@ -40,12 +40,22 @@ object AcousticTapClassifier {
         val confidenceNote: String
     )
 
+    /** The capture rate every path in this app uses. Training data must be recorded at it. */
+    const val CAPTURE_SAMPLE_RATE = SAMPLE_RATE
+
+    /**
+     * Raw mono 16-bit PCM straight off the mic, no codec, no resampling.
+     *
+     * Extracted so that training-data capture and inference go through the *identical*
+     * AudioRecord configuration. The model currently shipping was fitted on WhatsApp Opus
+     * at 16 kHz with AGC and noise suppression applied, and is served this — raw 44.1 kHz.
+     * That train/serve domain shift is a defect in its own right, separate from the sample
+     * size, and recording new data through any recorder app would only swap one codec for
+     * another. Both callers now share these five lines, so they cannot drift.
+     */
     @SuppressLint("MissingPermission")
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
-    fun recordAndClassifyOneTap(
-        recordMillis: Int = 1200,
-        trained: TrainedTapClassifier? = null
-    ): TapResult {
+    fun recordPcm(recordMillis: Int): ShortArray {
         val minBufferBytes = AudioRecord.getMinBufferSize(
             SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT
         )
@@ -74,8 +84,25 @@ object AcousticTapClassifier {
             recorder.stop()
             recorder.release()
         }
+        return pcm
+    }
 
-        return classify(pcm, trained)
+    @SuppressLint("MissingPermission")
+    @RequiresPermission(Manifest.permission.RECORD_AUDIO)
+    fun recordAndClassifyOneTap(
+        recordMillis: Int = 1200,
+        trained: TrainedTapClassifier? = null
+    ): TapResult = classify(recordPcm(recordMillis), trained)
+
+    /** Peak amplitude as dBFS, so a capture UI can reject a weak or clipped take. */
+    fun peakDbfs(pcm: ShortArray): Float {
+        var peak = 0
+        for (s in pcm) {
+            val a = if (s.toInt() == Short.MIN_VALUE.toInt()) 32768 else kotlin.math.abs(s.toInt())
+            if (a > peak) peak = a
+        }
+        if (peak == 0) return -120f
+        return 20f * log10(peak / 32768f)
     }
 
     /**

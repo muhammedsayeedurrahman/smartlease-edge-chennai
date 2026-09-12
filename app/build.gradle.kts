@@ -52,6 +52,9 @@ android {
     }
     buildFeatures {
         compose = true
+        // Needed for BuildConfig.DEBUG, which gates the training-data capture screen out
+        // of release builds. AGP does not generate BuildConfig unless asked.
+        buildConfig = true
     }
 
     androidResources {
@@ -83,6 +86,9 @@ dependencies {
     implementation(libs.androidx.camera.view)
 
     implementation(libs.mlkit.text.recognition)
+
+    // QR rendering of the findings digest (ReportScreen + last PDF page)
+    implementation(libs.zxing.core)
 
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The only thing this app ever shares. Scoped to the reports/ subdirectory of filesDir
+    rather than to filesDir itself, so the copied 13.7 MB model asset that also lives there
+    is not reachable through the provider.
+-->
+<paths>
+    <files-path name="reports" path="reports/" />
+    <!-- debug-only: zipped training-data captures leaving via the share sheet -->
+    <files-path name="exports" path="exports/" />
+</paths>

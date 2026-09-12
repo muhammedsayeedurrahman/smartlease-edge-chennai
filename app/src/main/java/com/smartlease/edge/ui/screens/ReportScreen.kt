@@ -1,5 +1,8 @@
 package com.smartlease.edge.ui.screens
 
+import android.content.Context
+import android.content.Intent
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,21 +15,32 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
+import com.smartlease.edge.report.FindingsDigest
 import com.smartlease.edge.report.InspectionReport
+import com.smartlease.edge.report.QrCode
+import com.smartlease.edge.report.ReportGenerator
 import com.smartlease.edge.ui.components.Lamp
 import com.smartlease.edge.ui.components.Panel
 import com.smartlease.edge.ui.components.StatusLamp
@@ -40,14 +54,17 @@ import java.util.Locale
  * two people look at when a deposit is disputed -- so it is laid out as a document rather
  * than as a feed: a verdict that states the outcome, then the evidence behind it.
  *
- * What "signed" means here is stated plainly at the bottom. ReportGenerator's own comment is
- * explicit that it bakes in a timestamp and session id rather than a cryptographic signature,
- * and a report that implies more provenance than it carries is worse than one that implies
+ * What "signed" means here is stated plainly at the bottom: the SHA-256 printed on the
+ * document and shown below is an integrity digest over the canonical findings, not a
+ * digital signature. It proves the record has not changed; it does not prove who made it.
+ * A report that implies more provenance than it carries is worse than one that implies
  * none -- it is the exact claim that would collapse under scrutiny in a dispute.
  */
 @Composable
 fun ReportScreen(report: InspectionReport?, onBack: () -> Unit) {
     val insets = WindowInsets.systemBars.asPaddingValues()
+    val context = LocalContext.current
+    var shareError by remember { mutableStateOf<String?>(null) }
 
     Column(
         Modifier
@@ -183,13 +200,79 @@ fun ReportScreen(report: InspectionReport?, onBack: () -> Unit) {
                 }
             }
 
+            // Shown on screen as well as in the PDF footer so both parties can read the same
+            // digest off the same phone and check it against the document afterwards.
             item {
                 Spacer(Modifier.height(6.dp))
+                Panel(Modifier.fillMaxWidth()) {
+                    Column {
+                        Text(
+                            "SHA-256 of ${report.findingCount} finding(s)",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(Modifier.height(10.dp))
+
+                        // Scannable by any phone's stock camera app: no install, no network.
+                        // The hex below it is the same string, so it can be checked either way.
+                        val qr = remember(report.findingsSha256) {
+                            runCatching { QrCode.bitmap(report.findingsSha256, 512).asImageBitmap() }
+                                .getOrNull()
+                        }
+                        if (qr != null) {
+                            Image(
+                                bitmap = qr,
+                                contentDescription = "QR code of the findings digest",
+                                modifier = Modifier.size(200.dp)
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                "Scan to read this digest on another phone.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.height(10.dp))
+                        }
+
+                        Text(
+                            FindingsDigest.grouped(report.findingsSha256),
+                            style = ReadoutValue,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "Change one character of one finding and this digest changes. It is " +
+                                "not a signature — it does not identify who recorded them.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(12.dp))
+                Button(
+                    onClick = { shareError = shareReport(context, report) },
+                    modifier = Modifier.fillMaxWidth().height(52.dp)
+                ) {
+                    Text("Share report (PDF)", style = MaterialTheme.typography.titleMedium)
+                }
+
+                shareError?.let {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+
+                Spacer(Modifier.height(14.dp))
                 // Provenance, stated exactly. Claiming a cryptographic signature this code
                 // does not produce would be the one line an opposing party could break.
                 Text(
                     "Written to this phone's storage with the session id and timestamp above. " +
-                        "No copy left the device. This is a timestamped record, not a " +
+                        "No copy left the device unless it was shared above. This is a " +
+                        "timestamped record carrying an integrity digest, not a " +
                         "cryptographically signed document.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -213,5 +296,44 @@ private fun MetaField(label: String, value: String) {
             style = ReadoutValue,
             color = MaterialTheme.colorScheme.onSurface
         )
+    }
+}
+
+/**
+ * Hand the rendered PDF to whatever the user picks. Before this existed the report was
+ * written to app-private storage with no provider and no intent, so the document the whole
+ * product is about could not reach either party.
+ *
+ * The digest goes in the message body as well as inside the PDF, so a recipient can compare
+ * the two without opening anything.
+ *
+ * @return null on success, or a message to show the user.
+ */
+private fun shareReport(context: Context, report: InspectionReport): String? {
+    val file = ReportGenerator.reportFile(context, report.sessionId)
+    if (!file.exists()) {
+        return "Report PDF not found — generate the report first."
+    }
+    return try {
+        val uri = FileProvider.getUriForFile(context, context.packageName + ".reports", file)
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "application/pdf"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(
+                Intent.EXTRA_SUBJECT,
+                "SmartLease Edge report — session ${report.sessionId.take(8)}"
+            )
+            putExtra(
+                Intent.EXTRA_TEXT,
+                "SHA-256 of ${report.findingCount} finding(s): ${report.findingsSha256}"
+            )
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(Intent.createChooser(send, "Share report").apply {
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        })
+        null
+    } catch (e: Exception) {
+        "Could not share: ${e.message ?: e.javaClass.simpleName}"
     }
 }

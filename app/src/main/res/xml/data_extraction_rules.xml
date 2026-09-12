@@ -1,6 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    Nothing in this app is eligible for cloud backup.
+
+    android:allowBackup="false" in the manifest already disables Auto Backup, but an EMPTY
+    <cloud-backup> element is a no-op (no rules means "include everything"), so every domain
+    is excluded explicitly here. That covers the report PDFs and the copied model files in
+    filesDir, which the previous rules — which named only smartlease.db — left in scope.
+
+    This is what makes the line printed on page one of every report true:
+    "Generated fully offline, on-device — no data left this phone." (ReportGenerator.kt)
+-->
 <data-extraction-rules>
     <cloud-backup>
-        <exclude domain="database" path="smartlease.db" />
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
     </cloud-backup>
 </data-extraction-rules>

@@ -12,14 +12,13 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.smartlease.edge.data.AppDatabase
 import com.smartlease.edge.report.InspectionReport
-import com.smartlease.edge.report.ReportGenerator
 import com.smartlease.edge.ui.screens.HomeScreen
 import com.smartlease.edge.ui.screens.ReportScreen
+import com.smartlease.edge.ui.screens.SelfTestScreen
+import com.smartlease.edge.ui.screens.TapCaptureScreen
 import com.smartlease.edge.ui.screens.WalkthroughScreen
 import com.smartlease.edge.ui.theme.SmartLeaseEdgeTheme
-import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -30,11 +29,11 @@ class MainActivity : ComponentActivity() {
             ActivityResultContracts.RequestMultiplePermissions()
         ) { /* handled by re-composition reading ContextCompat.checkSelfPermission */ }
 
+        // Only what the app uses. Location was requested here and never read.
         permissionLauncher.launch(
             arrayOf(
                 Manifest.permission.CAMERA,
-                Manifest.permission.RECORD_AUDIO,
-                Manifest.permission.ACCESS_FINE_LOCATION
+                Manifest.permission.RECORD_AUDIO
             )
         )
 
@@ -49,26 +48,38 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun SmartLeaseApp() {
     val navController = rememberNavController()
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val scope = rememberCoroutineScope()
     var loadedReport by remember { mutableStateOf<InspectionReport?>(null) }
 
     NavHost(navController = navController, startDestination = "home") {
         composable("home") {
+            // No "past reports" entry: there is no session-list query, so the button only
+            // ever reached an empty report screen. A missing feature costs nothing; a broken
+            // one a judge taps costs trust.
             HomeScreen(
                 onStartWalkthrough = { navController.navigate("walkthrough") },
-                onViewReports = { navController.navigate("report/none") }
+                onOpenSelfTest = { navController.navigate("selftest") },
+                onOpenTapCapture =
+                    if (BuildConfig.DEBUG) ({ navController.navigate("tapcapture") }) else null
             )
+        }
+        if (BuildConfig.DEBUG) {
+            composable("tapcapture") {
+                TapCaptureScreen(onBack = { navController.popBackStack() })
+            }
+        }
+        // Ships in release on purpose: the judging handset is a loaner and there may be
+        // no cable, no laptop and no adb at the venue.
+        composable("selftest") {
+            SelfTestScreen(onBack = { navController.popBackStack() })
         }
         composable("walkthrough") {
             WalkthroughScreen(
-                onReportGenerated = { sessionId ->
-                    scope.launch {
-                        val db = AppDatabase.get(context)
-                        val findings = db.inspectionDao().findingsForSessionOnce(sessionId)
-                        loadedReport = ReportGenerator.buildReport(sessionId, "Demo Property, Chennai", findings)
-                        navController.navigate("report/$sessionId")
-                    }
+                // The report is already built and rendered by the time this fires. Re-querying
+                // and rebuilding it here produced a second report object for the same session,
+                // with a different generatedAt, for no benefit.
+                onReportGenerated = { report ->
+                    loadedReport = report
+                    navController.navigate("report/${report.sessionId}")
                 }
             )
         }

@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    Android 11 and below (fullBackupContent). Superseded by allowBackup="false", kept
+    consistent with data_extraction_rules.xml so both files state the same intent: nothing
+    from this app is backed up. The previous version excluded only smartlease.db, which left
+    the report PDFs and the copied model files in filesDir inside Auto Backup's scope.
+-->
 <full-backup-content>
-    <!-- Inspection reports are local-only by design (offline-first) — excluded from cloud backup. -->
-    <exclude domain="database" path="smartlease.db" />
+    <exclude domain="root" />
+    <exclude domain="file" />
+    <exclude domain="database" />
+    <exclude domain="sharedpref" />
+    <exclude domain="external" />
 </full-backup-content>

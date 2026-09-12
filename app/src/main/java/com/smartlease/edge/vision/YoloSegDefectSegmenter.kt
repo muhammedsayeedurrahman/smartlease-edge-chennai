@@ -110,8 +110,14 @@ class YoloSegDefectSegmenter private constructor(
         private const val TAG = "YoloSegSegmenter"
         private const val PAD_VALUE = 114f / 255f
 
-        /** Asset filenames tried in order; the first that loads wins. */
-        private val CANDIDATE_ASSETS = listOf("yolov8n_seg.ptl", "vision_best.ptl")
+        /**
+         * Asset filenames tried in order; the first that loads AND satisfies the export
+         * contract wins. `vision_best.ptl` used to sit in this list and is now deleted from
+         * assets: it is a 5-class DETECTION export (`DetectionModel.forward -> Tensor`, no
+         * proto branch), not a segmentation model, and it caused the exact silent failure
+         * [returnsSegmentationTuple] now prevents.
+         */
+        private val CANDIDATE_ASSETS = listOf("yolov8n_seg.ptl")
 
         /**
          * @return a model-backed segmenter, or null when no usable model ships in assets —
@@ -120,16 +126,44 @@ class YoloSegDefectSegmenter private constructor(
         fun create(context: Context): YoloSegDefectSegmenter? {
             for (asset in CANDIDATE_ASSETS) {
                 val path = copyAssetIfPresent(context, asset) ?: continue
-                try {
-                    val module = LiteModuleLoader.load(path)
-                    Log.i(TAG, "Loaded segmentation model from asset '$asset'")
-                    return YoloSegDefectSegmenter(module)
+                val module = try {
+                    LiteModuleLoader.load(path)
                 } catch (e: Exception) {
                     Log.w(TAG, "Asset '$asset' present but failed to load: ${e.message}")
+                    continue
                 }
+                if (!returnsSegmentationTuple(module)) {
+                    Log.w(TAG, "Asset '$asset' loaded but is not a (preds, protos) export; skipping")
+                    continue
+                }
+                Log.i(TAG, "Loaded segmentation model from asset '$asset'")
+                return YoloSegDefectSegmenter(module)
             }
-            Log.w(TAG, "No loadable segmentation model in assets; caller should fall back")
+            Log.w(TAG, "No usable segmentation model in assets; caller should fall back")
             return null
+        }
+
+        /**
+         * One probe forward pass against the export contract, at load time.
+         *
+         * A detection-only export loads perfectly and then returns a single tensor, which
+         * [readOutputs] rejects on every frame — silently, because [segmentDefects] catches
+         * inference failures so a bad frame cannot end a walkthrough. The result was the
+         * worst of both: `isTrainedModel = true`, the UI labelling findings "YOLOv8n-Seg",
+         * and "nothing flagged" for every capture forever. Failing here instead means the
+         * caller falls back to the honestly-labelled heuristic segmenter.
+         */
+        private fun returnsSegmentationTuple(module: Module): Boolean = try {
+            val size = YoloSegConfig.INPUT_SIZE
+            val probe = Tensor.fromBlob(
+                FloatArray(3 * size * size),
+                longArrayOf(1, 3, size.toLong(), size.toLong())
+            )
+            val output = module.forward(IValue.from(probe))
+            output.isTuple && output.toTuple().size >= 2
+        } catch (e: Exception) {
+            Log.w(TAG, "Segmentation probe failed: ${e.message}")
+            false
         }
 
         /** PyTorch Lite needs a filesystem path, so assets are materialised once into filesDir. */

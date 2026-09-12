@@ -32,6 +32,7 @@ import com.smartlease.edge.data.Severity
 import com.smartlease.edge.ir.CommonAcIrProfiles
 import com.smartlease.edge.ir.IrController
 import com.smartlease.edge.ocr.OcrEngine
+import com.smartlease.edge.report.InspectionReport
 import com.smartlease.edge.report.ReportGenerator
 import com.smartlease.edge.safety.SafetyGate
 import com.smartlease.edge.ui.components.Lamp
@@ -39,8 +40,11 @@ import com.smartlease.edge.ui.components.ReadingRow
 import com.smartlease.edge.ui.components.StatusLamp
 import com.smartlease.edge.ui.theme.ReadoutValue
 import com.smartlease.edge.ui.theme.ReadoutValueLarge
+import com.smartlease.edge.vision.DefectSegmenter
 import com.smartlease.edge.vision.DefectSegmenterFactory
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.UUID
 
 /** A logged finding keeps its severity, so the list can show it rather than flatten to text. */
@@ -53,27 +57,48 @@ private data class LoggedFinding(
 
 /**
  * The inspection screen. Runs every subsystem in one flow: tilt alignment, capture with OCR
- * and defect segmentation, acoustic tap test, IR appliance trigger, then a signed local report.
+ * and defect segmentation, acoustic tap test, IR appliance trigger, then a local report
+ * carrying a SHA-256 over its findings.
+ *
+ * Nothing heavy runs on the main thread: the two models load in a LaunchedEffect, and every
+ * inference, the tap recording and the PDF render are dispatched to Dispatchers.Default.
  */
 @Composable
-fun WalkthroughScreen(onReportGenerated: (String) -> Unit) {
+fun WalkthroughScreen(onReportGenerated: (InspectionReport) -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
 
-    val sessionId = remember { UUID.randomUUID().toString().take(8) }
+    // Full UUID, not the first 8 hex characters. The session ID goes into the digest and
+    // onto the report; 32 bits of client-generated identifier is not an identifier.
+    val sessionId = remember { UUID.randomUUID().toString() }
     val cameraController = remember { CameraController(context, lifecycleOwner) }
     val arTracker = remember { ArAlignmentTracker(context) }
     val irController = remember { IrController(context) }
-    val visionSegmenter = remember { DefectSegmenterFactory.create(context) }
-    // null when no trained model ships -- classify() then keeps the heuristic
-    val trainedTapModel = remember { TrainedTapClassifier.create(context) }
     val db = remember { AppDatabase.get(context) }
+
+    // Loaded off the main thread by the LaunchedEffect below, not in remember { }.
+    // DefectSegmenterFactory.create copies a 13.7 MB asset on first run and then parses a
+    // TorchScript module; TrainedTapClassifier.create parses a 73 KB JSON carrying a
+    // 10,280-float mel filterbank. Both used to happen during composition, which froze the
+    // screen for seconds the first time anyone opened it.
+    var visionSegmenter by remember { mutableStateOf<DefectSegmenter?>(null) }
+    var trainedTapModel by remember { mutableStateOf<TrainedTapClassifier?>(null) }
+    var modelsLoading by remember { mutableStateOf(true) }
 
     var alignmentState by remember { mutableStateOf<ArAlignmentTracker.AlignmentState?>(null) }
     var findings by remember { mutableStateOf(listOf<LoggedFinding>()) }
     var lastSafetyVerdict by remember { mutableStateOf<SafetyGate.Verdict?>(null) }
     var busy by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        val segmenter = withContext(Dispatchers.Default) { DefectSegmenterFactory.create(context) }
+        // null when no trained model ships -- classify() then keeps the heuristic
+        val tap = withContext(Dispatchers.Default) { TrainedTapClassifier.create(context) }
+        visionSegmenter = segmenter
+        trainedTapModel = tap
+        modelsLoading = false
+    }
 
     val hasCameraPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
     val hasMicPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
@@ -83,7 +108,15 @@ fun WalkthroughScreen(onReportGenerated: (String) -> Unit) {
         onDispose { arTracker.stop() }
     }
 
-    fun logFinding(
+    /** A failure the operator should see, on the same list as the findings. */
+    fun note(label: String, detail: String) {
+        findings = findings + LoggedFinding(Lamp.CAUTION, label, "error", detail)
+    }
+
+    // Suspends until the row is committed. It used to fire-and-forget into scope.launch
+    // while "Save report" read the same table, so the last finding of a session could
+    // be missing from the PDF -- and from the digest computed over it.
+    suspend fun logFinding(
         type: FindingType,
         label: String,
         value: String,
@@ -92,12 +125,17 @@ fun WalkthroughScreen(onReportGenerated: (String) -> Unit) {
     ) {
         val verdict = SafetyGate.evaluate(label)
         lastSafetyVerdict = verdict
-        val severity = verdict.escalatedSeverity ?: Severity.INFO
+        // The gate only ever returns STOP_ESCALATE or nothing, so without this every visual
+        // defect was filed INFO and Severity.NOTABLE was unreachable by any code path -- the
+        // severity column in the report was decoration. A defect finding is NOTABLE; the
+        // hazard gate still overrides it upwards and nothing overrides it downwards.
+        val severity = verdict.escalatedSeverity
+            ?: if (type == FindingType.VISUAL_DEFECT) Severity.NOTABLE else Severity.INFO
         // A safety escalation always outranks the caller's own lamp.
         val effective = if (verdict.escalatedSeverity != null) Lamp.FLAG else lamp
         findings = findings + LoggedFinding(effective, label, value, detail ?: verdict.reason)
 
-        scope.launch {
+        try {
             db.inspectionDao().insert(
                 InspectionEntity(
                     sessionId = sessionId,
@@ -108,6 +146,9 @@ fun WalkthroughScreen(onReportGenerated: (String) -> Unit) {
                     severity = severity
                 )
             )
+        } catch (e: Exception) {
+            // The finding is already on screen; losing the row must not kill the session.
+            note("Not saved", e.message ?: e.javaClass.simpleName)
         }
     }
 
@@ -132,7 +173,7 @@ fun WalkthroughScreen(onReportGenerated: (String) -> Unit) {
                 color = MaterialTheme.colorScheme.onBackground
             )
             Text(
-                sessionId,
+                sessionId.take(8),
                 style = ReadoutValue,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -160,7 +201,17 @@ fun WalkthroughScreen(onReportGenerated: (String) -> Unit) {
                     // clipToBounds: PreviewView scales the frame to fill, and without a clip
                     // the TextureView paints well past its declared box.
                     modifier = Modifier.fillMaxSize().clipToBounds(),
-                    update = { previewView -> scope.launch { cameraController.bindTo(previewView) } }
+                    update = { previewView ->
+                        scope.launch {
+                            try {
+                                cameraController.bindTo(previewView)
+                            } catch (e: Exception) {
+                                // Another app holding the camera would otherwise crash the
+                                // walkthrough the moment this screen composes.
+                                note("Camera unavailable", e.message ?: e.javaClass.simpleName)
+                            }
+                        }
+                    }
                 )
             } else {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -226,30 +277,61 @@ fun WalkthroughScreen(onReportGenerated: (String) -> Unit) {
             }
         }
 
+        if (modelsLoading) {
+            Spacer(Modifier.height(10.dp))
+            Row(
+                Modifier.padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
+                Text(
+                    "Loading models",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+            }
+        }
+
         Spacer(Modifier.height(14.dp))
 
         // --- Controls. Capture is the primary action and is weighted as such. --------------
         Column(Modifier.padding(horizontal = 16.dp)) {
+            // Gated on the permission, not just on `busy`: without CAMERA the PreviewView
+            // above is never composed, so bindTo() never runs and captureBitmap() throws
+            // IllegalStateException into a coroutine with nothing to catch it.
             Button(
-                enabled = !busy,
+                enabled = !busy && !modelsLoading && hasCameraPermission,
                 onClick = {
                     scope.launch {
                         busy = true
                         try {
+                            val segmenter = visionSegmenter ?: return@launch
                             val bitmap = cameraController.captureBitmap()
-                            val text = OcrEngine.readText(bitmap)
+                            val text = try {
+                                OcrEngine.readText(bitmap)
+                            } catch (e: Exception) {
+                                // OcrEngine resumes with the exception on ML Kit failure. A failed
+                                // text read must not take the capture -- or the walkthrough -- down.
+                                note("OCR unavailable", e.message ?: "unknown error")
+                                ""
+                            }
                             if (text.isNotBlank()) {
                                 logFinding(
                                     FindingType.OCR_TEXT_READ, "Text read", "OCR",
                                     text.take(90)
                                 )
                             }
-                            val defects = visionSegmenter.segmentDefects(
-                                bitmap, frameWidthInches = 48f, frameHeightInches = 36f
-                            )
+                            // 640x640 forward pass plus an 8400-anchor decode. On the main thread
+                            // this was hundreds of milliseconds of frozen UI per capture.
+                            val defects = withContext(Dispatchers.Default) {
+                                segmenter.segmentDefects(
+                                    bitmap, frameWidthInches = 48f, frameHeightInches = 36f
+                                )
+                            }
                             // The label states which segmenter actually ran: a heuristic result
                             // must never read like a model detection in a tenant-facing report.
-                            val mode = if (visionSegmenter.isTrainedModel) "YOLOv8n-Seg" else "heuristic"
+                            val mode = if (segmenter.isTrainedModel) "YOLOv8n-Seg" else "heuristic"
                             defects.forEach { d ->
                                 logFinding(
                                     type = FindingType.VISUAL_DEFECT,
@@ -264,6 +346,8 @@ fun WalkthroughScreen(onReportGenerated: (String) -> Unit) {
                                     Lamp.PASS, "Capture", "clear", "Nothing flagged in this frame"
                                 )
                             }
+                        } catch (e: Exception) {
+                            note("Capture failed", e.message ?: e.javaClass.simpleName)
                         } finally {
                             busy = false
                         }
@@ -272,7 +356,12 @@ fun WalkthroughScreen(onReportGenerated: (String) -> Unit) {
                 modifier = Modifier.fillMaxWidth().height(52.dp)
             ) {
                 Text(
-                    if (busy) "Analysing" else "Capture and analyse",
+                    when {
+                        !hasCameraPermission -> "Camera access needed"
+                        modelsLoading -> "Loading models"
+                        busy -> "Analysing"
+                        else -> "Capture and analyse"
+                    },
                     style = MaterialTheme.typography.titleMedium
                 )
             }
@@ -280,7 +369,21 @@ fun WalkthroughScreen(onReportGenerated: (String) -> Unit) {
             Spacer(Modifier.height(8.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
-                    onClick = { arTracker.captureBaseline() },
+                    onClick = {
+                        arTracker.captureBaseline()
+                        // Recorded so the report shows a baseline was set and when.
+                        // FindingType.AR_BASELINE_ALIGNMENT was declared and never emitted.
+                        scope.launch {
+                            val s = alignmentState
+                            val pose = if (s == null) "pose unavailable"
+                            else "pitch %d, roll %d".format(s.pitchDeg.toInt(), s.rollDeg.toInt())
+                            logFinding(
+                                FindingType.AR_BASELINE_ALIGNMENT,
+                                "Baseline pose recorded", "baseline",
+                                "$pose. Held in memory for this session only."
+                            )
+                        }
+                    },
                     modifier = Modifier.weight(1f).height(46.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
                         contentColor = MaterialTheme.colorScheme.onBackground
@@ -288,14 +391,18 @@ fun WalkthroughScreen(onReportGenerated: (String) -> Unit) {
                 ) { Text("Set baseline") }
 
                 OutlinedButton(
-                    enabled = !busy && hasMicPermission,
+                    enabled = !busy && !modelsLoading && hasMicPermission,
                     onClick = {
                         scope.launch {
                             busy = true
                             try {
-                                val result = AcousticTapClassifier.recordAndClassifyOneTap(
-                                    trained = trainedTapModel
-                                )
+                                // 1.2 s of blocking AudioRecord reads plus a 4096-point FFT. This
+                                // ran on the main thread and froze the UI for the whole recording.
+                                val result = withContext(Dispatchers.Default) {
+                                    AcousticTapClassifier.recordAndClassifyOneTap(
+                                        trained = trainedTapModel
+                                    )
+                                }
                                 val lamp = when (result.verdict) {
                                     AcousticTapClassifier.TapVerdict.LIKELY_HOLLOW -> Lamp.FLAG
                                     AcousticTapClassifier.TapVerdict.LIKELY_SOLID -> Lamp.PASS
@@ -310,6 +417,9 @@ fun WalkthroughScreen(onReportGenerated: (String) -> Unit) {
                                     FindingType.ACOUSTIC_TAP, "Tap test", reading,
                                     result.confidenceNote, lamp
                                 )
+                            } catch (e: Exception) {
+                                // AudioRecord construction throws if the mic is held elsewhere.
+                                note("Tap test failed", e.message ?: e.javaClass.simpleName)
                             } finally {
                                 busy = false
                             }
@@ -326,18 +436,27 @@ fun WalkthroughScreen(onReportGenerated: (String) -> Unit) {
             OutlinedButton(
                 enabled = !busy && irController.hasIrBlaster,
                 onClick = {
-                    val profile = CommonAcIrProfiles.profiles.first()
-                    // Placeholder burst, replaced by the on-site capture for the demo unit.
-                    val placeholderPattern = intArrayOf(9000, 4500, 560, 560, 560, 1690)
-                    when (val result = irController.transmit(profile.typicalCarrierHz, placeholderPattern)) {
-                        is IrController.TransmitResult.Success -> logFinding(
-                            FindingType.IR_APPLIANCE_CHECK, "AC responded", "IR sent",
-                            profile.brand + " profile, placeholder pattern", Lamp.PASS
-                        )
-                        is IrController.TransmitResult.Failure -> logFinding(
-                            FindingType.IR_APPLIANCE_CHECK, "AC check skipped", "no IR",
-                            result.reason, Lamp.CAUTION
-                        )
+                    scope.launch {
+                        val profile = CommonAcIrProfiles.profiles.first()
+                        // NEC-family header timings. The demo unit's real burst has to be captured
+                        // on-site with an external receiver -- ConsumerIrManager cannot receive IR
+                        // (see IrController) -- so the label below never claims more than was done:
+                        // the emitter fired, and nothing confirmed the appliance responded.
+                        val necHeaderBurst = intArrayOf(9000, 4500, 560, 560, 560, 1690)
+                        when (val result =
+                            irController.transmit(profile.typicalCarrierHz, necHeaderBurst)) {
+                            is IrController.TransmitResult.Success -> logFinding(
+                                FindingType.IR_APPLIANCE_CHECK, "IR command transmitted", "IR sent",
+                                "%s, %d kHz — pattern not verified against this unit".format(
+                                    profile.brand, profile.typicalCarrierHz / 1000
+                                ),
+                                Lamp.PASS
+                            )
+                            is IrController.TransmitResult.Failure -> logFinding(
+                                FindingType.IR_APPLIANCE_CHECK, "IR transmit failed", "no IR",
+                                result.reason, Lamp.CAUTION
+                            )
+                        }
                     }
                 },
                 modifier = Modifier.fillMaxWidth().height(46.dp),
@@ -426,11 +545,19 @@ fun WalkthroughScreen(onReportGenerated: (String) -> Unit) {
                     busy = true
                     try {
                         val stored = db.inspectionDao().findingsForSessionOnce(sessionId)
-                        val report = ReportGenerator.buildReport(
-                            sessionId, "Demo Property, Chennai", stored
-                        )
-                        ReportGenerator.renderToPdf(context, report)
-                        onReportGenerated(sessionId)
+                        // Digest, layout and file write, all off the UI thread. Built once
+                        // here and handed upwards -- MainActivity used to re-query and
+                        // rebuild it, producing a second report object for the same session.
+                        val report = withContext(Dispatchers.Default) {
+                            val r = ReportGenerator.buildReport(
+                                sessionId, "Demo Property, Chennai", stored
+                            )
+                            ReportGenerator.renderToPdf(context, r)
+                            r
+                        }
+                        onReportGenerated(report)
+                    } catch (e: Exception) {
+                        note("Report generation failed", e.message ?: e.javaClass.simpleName)
                     } finally {
                         busy = false
                     }

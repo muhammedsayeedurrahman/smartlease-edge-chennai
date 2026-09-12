@@ -160,3 +160,9 @@ ml/YOLOV8/runs/
 !ml/YOLOV8/qnn_android_bundle/
 !ml/YOLOV8/qnn_android_bundle/*.so
 !ml/YOLOV8/qnn_android_bundle/*.pte
+
+# IDE project files — an Android Studio sync silently bumped AGP/Kotlin/KSP/Gradle here on
+# 2026-09-12 and left it uncommitted 21 minutes after the working APK was built. The
+# toolchain is pinned deliberately (see tag demo-known-good); do not let a sync move it.
+.idea/
+gradle/gradle-daemon-jvm.properties

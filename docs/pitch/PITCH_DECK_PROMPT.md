@@ -3,6 +3,18 @@
 Generated 2026-09-06 for the iQOO Hackathon 2026, Chennai City Battle (Sep 12–13), Smart Living track.
 Companion files: `SmartLease-Edge-iQOO-Hackathon-2026.pptx` (17 slides, speaker notes on every slide) and `build/` (regenerates the deck: `python build_deck.py assets out.pptx`).
 
+> **SUPERSEDED IN PART — 2026-09-12.** The `.pptx` was corrected against the shipping code
+> (see `AUDIT_CLAIMS.md` at the workspace root). The slide specs in §3 below still describe
+> the pre-correction deck on these points and must **not** be used to regenerate it:
+> Hexagon NPU / HTP execution (all three models run on the CPU via PyTorch Lite; the
+> ExecuTorch `.pte` is compiled and in the repo but not in the APK), on-device Llama 3.2 3B /
+> GenieX (the narrative is rule-based templating), SHA-256 and dual signatures (not
+> implemented), ARCore depth (no depth source exists), Sensing Hub always-on capture (no
+> third-party API for it), mic-verified IR (`ConsumerIrManager` is transmit-only), the
+> confidence-hiding and dismiss behaviour (not implemented), "580+ images" (2,106) and the
+> class list (`crack, peeling, spalling, stain_mould`), and "100+ own recordings" (15 taps
+> from 8 recordings). The **script in §5 is current** — it has been corrected in place.
+
 ---
 
 ## 1. What the research found (why this deck looks the way it does)
@@ -121,11 +133,11 @@ Slide order and required content:
 
 ## 4. Three-minute pitch script (slides 1, 2, 4, 5, 8, 9, 11, 12, 15)
 
-- **0:00–0:10 (slide 1)** "SmartLease Edge turns the iQOO 15 into a property inspector. Point the camera, tap the wall, point the IR blaster at the AC, and in sixty seconds both tenant and landlord hold a signed report. Nothing leaves the phone."
+- **0:00–0:10 (slide 1)** "SmartLease Edge turns the iQOO 15 into a property inspector. Point the camera, tap the wall, point the IR blaster at the AC, and in sixty seconds you have a timestamped condition report. No network permission, no backup, nothing leaves the phone."
 - **0:10–0:45 (slide 2)** Priya's story, then the three numbers, then: "Every source traces the dispute to the same thing: no timestamped move-in record."
-- **0:45–1:05 (slide 4)** Three sensors, one report. "We test whether the AC works, not whether it looks fine."
+- **0:45–1:05 (slide 4)** Three sensors, one report. "The IR blaster is the check a camera cannot do — today it proves the command was sent; the mic listen-back that closes the loop is the next step."
 - **1:05–2:35 (slide 5 as backdrop, LIVE DEMO)** Airplane Mode on, Office Kit mirror on. Baseline → scan → tap → IR → generate. One presenter narrates, one drives.
-- **2:35–2:50 (slides 8–9)** "Everything you saw ran on the Hexagon NPU and the CPU; the IR blaster and Sensing Hub are why this is an iQOO app."
+- **2:35–2:50 (slides 8–9)** "Everything you saw ran on the CPU. The ExecuTorch INT8 lowering is done and in the repo — `qnn_android_bundle/yolov8n_seg_htp.pte` — what we didn't finish is wiring the HTP delegate into the APK. The IR blaster is why this is an iQOO app."
 - **2:50–3:05 (slides 11–12)** "zInspector and RentCheck have AI; neither works offline or tests function. What you saw is in the repo today; the two models were trained before this weekend."
 - **3:05–3:20 (slide 15)** "Every Indian renter deserves a fair move-out. We are not pitching an idea." Stop. Invite questions.
 
