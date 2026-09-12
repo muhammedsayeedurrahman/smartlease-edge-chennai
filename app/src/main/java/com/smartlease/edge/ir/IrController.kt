@@ -47,6 +47,18 @@ class IrController(context: Context) {
         }
     }
 
+    /**
+     * Transmits the candidate O General/Fujitsu_AC short (toggle) frame — see
+     * [FujitsuAcCandidate] for exactly what is and isn't verified about this. Deliberately
+     * kept out of the normal walkthrough flow; call only when actually testing against the
+     * venue unit, never as part of the scripted demo until it's confirmed to work.
+     */
+    fun transmitFujitsuCandidate(turnOn: Boolean): TransmitResult {
+        val frame = FujitsuAcCandidate.shortFrame(turnOn)
+        val pattern = FujitsuAcCandidate.toRawPattern(frame)
+        return transmit(FujitsuAcCandidateTiming.CARRIER_HZ, pattern)
+    }
+
     sealed class TransmitResult {
         object Success : TransmitResult()
         data class Failure(val reason: String) : TransmitResult()

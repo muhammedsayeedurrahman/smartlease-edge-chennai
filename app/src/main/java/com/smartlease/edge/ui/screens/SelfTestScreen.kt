@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import com.smartlease.edge.diagnostics.SelfTest
+import com.smartlease.edge.ir.IrController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -33,10 +34,12 @@ import java.io.File
 fun SelfTestScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val irController = remember { IrController(context) }
 
     var sections by remember { mutableStateOf<List<SelfTest.Section>>(emptyList()) }
     var running by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<String?>(null) }
+    var irCandidateStatus by remember { mutableStateOf<String?>(null) }
 
     fun run() {
         scope.launch {
@@ -91,6 +94,37 @@ fun SelfTestScreen(onBack: () -> Unit) {
                 Text("Loading models and timing inference…", fontSize = 12.sp)
             }
         }
+
+        Spacer(Modifier.height(14.dp))
+        Text(
+            "IR LAB — candidate O General/Fujitsu_AC frame (2026-09-12 lead, UNVERIFIED)",
+            fontWeight = FontWeight.Bold,
+            fontSize = 12.sp
+        )
+        Text(
+            "Not the demo pattern. Ported from IRremoteESP8266's real protocol data, but " +
+                    "not confirmed to work on this AC brand/model — see FujitsuAcCandidate.kt " +
+                    "and docs/EXECUTION_PLAN.md. Only use this to actually test against a unit.",
+            fontSize = 10.sp
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(enabled = irController.hasIrBlaster, onClick = {
+                irCandidateStatus = when (val r = irController.transmitFujitsuCandidate(turnOn = true)) {
+                    is IrController.TransmitResult.Success -> "Sent candidate ON frame — did the AC react?"
+                    is IrController.TransmitResult.Failure -> "Failed: ${r.reason}"
+                }
+            }) { Text("Send candidate ON") }
+            OutlinedButton(enabled = irController.hasIrBlaster, onClick = {
+                irCandidateStatus = when (val r = irController.transmitFujitsuCandidate(turnOn = false)) {
+                    is IrController.TransmitResult.Success -> "Sent candidate OFF frame — did the AC react?"
+                    is IrController.TransmitResult.Failure -> "Failed: ${r.reason}"
+                }
+            }) { Text("Send candidate OFF") }
+        }
+        if (!irController.hasIrBlaster) {
+            Text("No IR blaster detected on this device.", fontSize = 10.sp)
+        }
+        irCandidateStatus?.let { Text(it, fontSize = 11.sp) }
 
         Spacer(Modifier.height(10.dp))
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
