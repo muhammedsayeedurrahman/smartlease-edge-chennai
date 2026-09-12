@@ -121,10 +121,13 @@ fun ReportScreen(report: InspectionReport?, onBack: () -> Unit) {
 
             // Identity of the document. Both values are monospace because they are what two
             // people read aloud to each other to confirm they are holding the same report.
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                MetaField("Session", report.sessionId)
-                MetaField("Recorded", stamp)
-            }
+            // Stacked rather than side by side: the session id is a full 36-character UUID,
+            // which at this monospace size needs nearly the full row width on its own --
+            // sharing a row with "Recorded" would squeeze that field to a one-character-wide
+            // column that wraps vertically instead of reading as a line of text.
+            MetaField("Session", report.sessionId, modifier = Modifier.fillMaxWidth())
+            Spacer(Modifier.height(10.dp))
+            MetaField("Recorded", stamp, modifier = Modifier.fillMaxWidth())
         }
 
         Spacer(Modifier.height(16.dp))
@@ -428,8 +431,8 @@ private fun DeductionLineRow(line: DeductionLine) {
 }
 
 @Composable
-private fun MetaField(label: String, value: String) {
-    Column {
+private fun MetaField(label: String, value: String, modifier: Modifier = Modifier) {
+    Column(modifier) {
         Text(
             label,
             style = MaterialTheme.typography.bodySmall,
