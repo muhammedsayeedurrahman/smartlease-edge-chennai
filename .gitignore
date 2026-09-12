@@ -177,3 +177,7 @@ server/**/__pycache__/
 
 # Downloaded evaluation datasets — re-fetchable, not source.
 ml/data/external/
+
+powershell.bat
+.vscode/
+

@@ -33,7 +33,8 @@ import java.io.File
  */
 class GemmaReportNarrator private constructor(
     private val engine: LlmInference,
-    private val modelName: String
+    private val modelName: String,
+    private val maxTokens: Int = MAX_TOKENS
 ) : ReportNarrator {
 
     override suspend fun narrate(
@@ -112,17 +113,27 @@ class GemmaReportNarrator private constructor(
          * that cannot run the model must still produce reports, so failure here is an expected
          * state, not an error condition.
          */
-        fun tryCreate(context: Context, file: File): GemmaReportNarrator? = runCatching {
+        /**
+         * @param maxTokens overrides [MAX_TOKENS] when the load balancer decides a smaller
+         *   budget is needed for a large model or a low-memory device.
+         */
+        fun tryCreate(
+            context: Context,
+            file: File,
+            maxTokens: Int = MAX_TOKENS
+        ): GemmaReportNarrator? = runCatching {
             val options = LlmInference.LlmInferenceOptions.builder()
                 .setModelPath(file.absolutePath)
-                .setMaxTokens(MAX_TOKENS)
+                .setMaxTokens(maxTokens)
                 // Greedy decoding: two runs over the same findings should produce the same
                 // paragraph. A report that reworded itself on every regeneration would make
                 // the findings digest look like the only stable thing on the page, and would
                 // make "we regenerated it and it says something else" a real conversation.
                 .setMaxTopK(1)
                 .build()
-            GemmaReportNarrator(LlmInference.createFromOptions(context, options), file.name)
+            GemmaReportNarrator(
+                LlmInference.createFromOptions(context, options), file.name, maxTokens
+            )
         }.onFailure {
             Log.w(TAG, "Could not load Gemma model at ${file.absolutePath}", it)
         }.getOrNull()

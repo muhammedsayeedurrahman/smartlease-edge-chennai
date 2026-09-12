@@ -53,6 +53,12 @@ android {
         buildConfigField("String", "SMARTLEASE_API_KEY", "\"$smartleaseApiKey\"")
     }
 
+    testOptions {
+        unitTests {
+            isReturnDefaultValues = true
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -121,6 +127,7 @@ dependencies {
     // The app builds, installs and produces reports with no model file present; narration
     // falls back to rule-based templating and says so on the page.
     implementation(libs.mediapipe.tasks.genai)
+
 
     // Backend sync client (com.smartlease.edge.sync) -- uploads a digest + metadata only.
     implementation(libs.retrofit.core)

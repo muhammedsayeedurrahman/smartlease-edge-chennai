@@ -53,6 +53,9 @@ enum class NarrationSource {
     /** Rule-based string assembly. Deterministic; cannot invent a finding. */
     TEMPLATE,
 
-    /** Written by an on-device Gemma model, and audited before being accepted. */
-    GEMMA
+    /** Written by an on-device Gemma model via MediaPipe tasks-genai, and audited. */
+    GEMMA,
+
+    /** Written by an on-device Gemma model via LiteRT GenAI (.litertlm), and audited. */
+    LITERT_GEMMA
 }

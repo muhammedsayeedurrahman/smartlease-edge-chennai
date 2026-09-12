@@ -116,7 +116,7 @@ object ReportGenerator {
     internal fun narrationCredit(source: NarrationSource): String = when (source) {
         NarrationSource.TEMPLATE ->
             "Written by rule from the findings above -- no language model involved."
-        NarrationSource.GEMMA ->
+        NarrationSource.GEMMA, NarrationSource.LITERT_GEMMA ->
             "Written by an on-device Gemma model from the findings above, and checked against " +
                 "them before printing. No text left this phone."
     }

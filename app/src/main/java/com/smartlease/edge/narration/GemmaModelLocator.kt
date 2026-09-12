@@ -36,7 +36,11 @@ object GemmaModelLocator {
     private val EXTENSIONS = listOf(".task", ".litertlm", ".bin")
 
     sealed interface Location {
-        data class Found(val file: File) : Location
+        data class Found(val file: File) : Location {
+            /** True when the file is a LiteRT-LM container (.litertlm), false for .task/.bin. */
+            val isLiteRtLm: Boolean
+                get() = file.name.endsWith(".litertlm", ignoreCase = true)
+        }
         data class Missing(val searched: List<String>) : Location
     }
 
