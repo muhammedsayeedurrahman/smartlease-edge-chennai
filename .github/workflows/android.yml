@@ -1,0 +1,55 @@
+name: Android
+
+# Runs on every push and PR. The point is not ceremony: this repo has already
+# shipped a HEAD that did not compile (a field rename that reached the entity and
+# the payload but not the screen), and it went unnoticed because the only check
+# was whoever happened to build locally. One job that compiles and runs the unit
+# tests would have caught it in three minutes.
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # The repo carries model weights and a 13.7 MB .ptl; shallow checkout is fine
+      # but LFS is not in use, so nothing extra is needed here.
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Compile
+        run: ./gradlew :app:compileDebugKotlin --no-daemon
+
+      - name: Unit tests
+        run: ./gradlew :app:testDebugUnitTest --no-daemon
+
+      # Publishes the JUnit XML even when the step above fails, so a red build
+      # says which assertion broke rather than only that Gradle exited non-zero.
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-results
+          path: app/build/test-results/testDebugUnitTest/
+          retention-days: 14
+
+      - name: Assemble debug APK
+        run: ./gradlew :app:assembleDebug --no-daemon

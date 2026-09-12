@@ -1,0 +1,22 @@
+# This repo is developed on Windows and built on Linux CI. Without this, a
+# checkout with core.autocrlf=true can hand the Gradle wrapper CRLF endings and
+# Linux then fails it with "bad interpreter: /bin/sh^M" — an error that reads as
+# a Gradle problem and is not one.
+* text=auto
+
+gradlew         text eol=lf
+*.sh            text eol=lf
+gradlew.bat     text eol=crlf
+
+# Binary: never normalise, never diff as text.
+*.ptl           binary
+*.pt            binary
+*.pte           binary
+*.apk           binary
+*.aab           binary
+*.parquet       binary
+*.png           binary
+*.jpg           binary
+*.jpeg          binary
+*.wav           binary
+*.pdf           binary
