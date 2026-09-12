@@ -14,6 +14,7 @@ import com.smartlease.edge.data.SessionType
 import com.smartlease.edge.deduction.DeductionEngine
 import com.smartlease.edge.deduction.DeductionLine
 import com.smartlease.edge.deduction.DeductionSummary
+import com.smartlease.edge.sync.buildTimeSyncConfig
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
@@ -106,10 +107,18 @@ object ReportGenerator {
                 "Severity breakdown: $severities."
     }
 
+    /**
+     * @param syncEnabled whether this build is configured to upload anything. It changes what
+     * the Section 63 certificate and the attestation note are allowed to assert, so it is read
+     * from the same build-time config the sync code itself uses rather than passed by each
+     * caller -- a screen that forgot to pass it would silently print the wrong claim on an
+     * evidentiary document.
+     */
     fun renderToPdf(
         context: Context,
         report: InspectionReport,
-        countersignatures: List<CountersignatureEntity> = emptyList()
+        countersignatures: List<CountersignatureEntity> = emptyList(),
+        syncEnabled: Boolean = buildTimeSyncConfig().syncEnabled
     ): File {
         val document = PdfDocument()
         val titlePaint = Paint().apply { textSize = 20f; isFakeBoldText = true }
@@ -191,8 +200,8 @@ object ReportGenerator {
         y = MARGIN.toFloat()
 
         val closingCursor = PdfCursor(document, page, canvas, pageNumber, y)
-        drawSection63Certificate(closingCursor, report)
-        drawDeviceAttestation(closingCursor, report)
+        drawSection63Certificate(closingCursor, report, syncEnabled)
+        drawDeviceAttestation(closingCursor, report, syncEnabled)
         if (countersignatures.isNotEmpty()) {
             drawCountersignatures(closingCursor, report, countersignatures)
         }
@@ -438,7 +447,60 @@ object ReportGenerator {
      * populated automatically from device and app data and labelled a draft, with blank
      * lines below for that person to complete by hand.
      */
-    private fun drawSection63Certificate(cursor: PdfCursor, report: InspectionReport) {
+    /**
+     * The "Manner of production" line of the Section 63 certificate.
+     *
+     * This is a statement of fact on a document about where evidence came from, so it says
+     * what this build actually does. It used to read "...; no network transmission at any
+     * point.", which was true while the app declared no INTERNET permission and stopped being
+     * true the moment sync could POST a findings digest. What holds in both configurations is
+     * the part that decides the tenant's privacy: the inspection media itself is never
+     * transmitted, because the upload types carry no bitmap, byte-array or file-path field and
+     * the server schema has no binary column. That half is stated unconditionally; the rest is
+     * conditioned on [syncEnabled] rather than softened into vagueness.
+     *
+     * Named and internal so a test can assert on the sentence the PDF actually prints instead
+     * of on a copy of it -- a duplicated string is exactly how the old claim survived the
+     * change that falsified it.
+     */
+    internal fun mannerOfProduction(syncEnabled: Boolean): String =
+        "Captured on-device (camera, microphone, IR emitter, motion sensors) and recorded to " +
+            "local app storage. " +
+            if (syncEnabled) {
+                "This build is configured to upload the findings digest and its counters " +
+                    "(findings count, deposit and deduction totals) to the configured server; " +
+                    "the photos, video and audio are not uploaded and cannot be -- no field on " +
+                    "the upload carries them."
+            } else {
+                "Sync is not configured in this build, so nothing was transmitted."
+            }
+
+    /**
+     * Why the attestation is a local hardware signature rather than Play Integrity. Same
+     * reasoning as [mannerOfProduction]: the old wording justified the choice by claiming the
+     * app could not reach the network at all, which is no longer the reason it is not used.
+     */
+    internal fun attestationProvenanceNote(syncEnabled: Boolean): String =
+        "Play Integrity is deliberately not used here: it would make the attestation depend " +
+            "on a Google server being reachable at signing time, and a report must still be " +
+            "produceable in a flat with no signal. " +
+            if (syncEnabled) {
+                "This build does declare the INTERNET permission, for report sync -- the " +
+                    "signature above is still produced entirely on this device."
+            } else {
+                // Not "nothing was transmitted" again: the certificate above already says that,
+                // and here it would answer a question nobody asked. This paragraph is about
+                // where the signature came from, so it stays about that.
+                "The app declares the INTERNET permission for optional report sync, which is " +
+                    "not configured in this build; either way the signature above is produced " +
+                    "entirely on this device."
+            }
+
+    private fun drawSection63Certificate(
+        cursor: PdfCursor,
+        report: InspectionReport,
+        syncEnabled: Boolean
+    ) {
         val headerPaint = TextPaint().apply { textSize = 13f; isFakeBoldText = true }
         val bodyPaint = TextPaint().apply { textSize = 9.5f }
         val boldBodyPaint = TextPaint(bodyPaint).apply { isFakeBoldText = true }
@@ -473,8 +535,7 @@ object ReportGenerator {
             "Device" to "${Build.MANUFACTURER} ${Build.MODEL}",
             "Operating system" to "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})",
             "Producing application" to "SmartLease Edge ${BuildConfig.VERSION_NAME}",
-            "Manner of production" to ("Captured on-device (camera, microphone, IR emitter, motion " +
-                "sensors) and recorded to local app storage; no network transmission at any point."),
+            "Manner of production" to mannerOfProduction(syncEnabled),
             "Capture window" to captureWindow,
             "Session identifier" to report.sessionId,
             "Findings digest (SHA-256)" to report.findingsSha256
@@ -506,7 +567,11 @@ object ReportGenerator {
      * yields two different but equally valid signatures over the same digest) and is wrapped
      * so a KeyStore failure on some device degrades this section rather than the whole render.
      */
-    private fun drawDeviceAttestation(cursor: PdfCursor, report: InspectionReport) {
+    private fun drawDeviceAttestation(
+        cursor: PdfCursor,
+        report: InspectionReport,
+        syncEnabled: Boolean
+    ) {
         val headerPaint = TextPaint().apply { textSize = 13f; isFakeBoldText = true }
         val bodyPaint = TextPaint().apply { textSize = 9.5f }
         val labelPaint = TextPaint().apply { textSize = 9f; color = 0xFF666666.toInt() }
@@ -539,8 +604,7 @@ object ReportGenerator {
             "The findings digest above was signed with a private key generated inside this " +
                 "device's secure hardware ($hardwareNote) and never exported from it. This proves " +
                 "the signature was produced by this specific phone; it does not identify who was " +
-                "operating it. Play Integrity was deliberately not used here -- it requires a " +
-                "network round-trip this app cannot make, since it declares no INTERNET permission.",
+                "operating it. " + attestationProvenanceNote(syncEnabled),
             bodyPaint
         )
 

@@ -18,9 +18,11 @@ import java.security.spec.ECGenParameterSpec
  * AndroidKeyStore (StrongBox where the chip has one, TEE everywhere else) and never
  * exported. This proves the signature was produced by this specific phone's secure
  * hardware — it does NOT identify who operated it, and it is deliberately not Play
- * Integrity: Play Integrity needs a network round-trip to Google's servers to verify,
- * which this app cannot make since it declares no INTERNET permission. A hardware-backed
- * local signature is the strongest attestation available without breaking that guarantee.
+ * Integrity: Play Integrity needs a network round-trip to Google's servers to verify, and a
+ * report has to be produceable in a flat with no signal. (The app now does declare INTERNET,
+ * for report sync — but making the *signature* depend on reachability would trade a guarantee
+ * for a dependency.) A hardware-backed local signature is the strongest attestation available
+ * that stays offline.
  *
  * The key is reused across every report this device ever signs, so re-rendering the same
  * report twice produces two different (both valid) ECDSA signatures over the same digest —

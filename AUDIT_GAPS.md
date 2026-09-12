@@ -10,7 +10,11 @@ Sorted by severity, then by estimated hours ascending. Hours assume one develope
 ---
 
 ### P0-1 · Your privacy headline is contradicted by one attribute
-**0.1 h**
+**0.1 h** — **RESOLVED (`ce9989f`), and its premise has since changed.** `allowBackup` is now
+false with every backup domain excluded. Note that the judge question quoted below ("You have no
+INTERNET permission") no longer applies: the app declares INTERNET for report sync as of
+2026-09-12. See JUDGE_QA Q17 for the answer to give now; the finding is kept here as the record
+of what was true at audit time.
 
 **What is wrong** — `app/src/main/AndroidManifest.xml:23` sets `android:allowBackup="true"`. `app/src/main/res/xml/backup_rules.xml:4` and `data_extraction_rules.xml:4` exclude only `smartlease.db`. The generated PDF (`report/ReportGenerator.kt:120`) and the 13.7 MB copied model (`vision/YoloSegDefectSegmenter.kt:137-141`) both live in `filesDir` and are therefore inside Google Auto Backup's scope. The PDF prints *"Generated fully offline, on-device — no data left this phone."* (`ReportGenerator.kt:94`) on a document Android will upload to Google Drive.
 

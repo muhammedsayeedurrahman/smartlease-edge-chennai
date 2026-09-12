@@ -222,22 +222,44 @@ verified twice on 2026-09-12 (zero `INTERNET` entries in the merged manifest; `d
 on the installed build listed only `TRANSMIT_IR`, `CAMERA`, `RECORD_AUDIO` and an internal
 broadcast permission), so it was a fair claim at the time — it simply stopped being one.
 
-**The PDF wording changed with it.** Page one used to print *"Generated fully offline,
-on-device — no data left this phone."* It now prints *"Captured and analysed on-device. Photos,
-video and audio never leave this phone."* — true under every build configuration. A stale claim
-printed on the tenant-facing evidence artefact is the last place one should be allowed to
-survive.
+**The PDF wording changed with it, in three places.** Page one used to print *"Generated fully
+offline, on-device — no data left this phone."*; it now prints *"Captured and analysed on-device.
+Photos, video and audio never leave this phone."* — true under every build configuration. The
+Section 63 certificate's "Manner of production" line used to end *"; no network transmission at
+any point."* and the attestation paragraph justified skipping Play Integrity *"since it declares
+no INTERNET permission"*; both were true before sync and false after it. They are now written by
+`ReportGenerator.mannerOfProduction()` and `attestationProvenanceNote()`, which state what the
+running build actually does, and `ReportProvenanceClaimsDeviceTest` fails the build if either
+sentence ever denies the INTERNET permission again. A stale claim printed on the tenant-facing
+evidence artefact is the last place one should be allowed to survive — and on a document offered
+as a Section 63 certificate it is a false statement about the provenance of evidence, not a
+marketing overreach.
+
+**If a judge asks what the certificate says now:** with sync unconfigured (the demo build) it
+reads *"Captured on-device (camera, microphone, IR emitter, motion sensors) and recorded to local
+app storage. Sync is not configured in this build, so nothing was transmitted."* With sync on it
+names what leaves — the findings digest and the rupee counters — and states that the media is not
+uploaded and cannot be.
 
 **Superseded (do not use):** No. `AndroidManifest.xml:23` sets `allowBackup="true"` and the backup rules exclude only `smartlease.db`. The generated PDF sits in `filesDir` and is inside Google Auto Backup's scope — so it goes to the user's Google Drive. The PDF prints *"Generated fully offline, on-device — no data left this phone."* on page one.
 
-**Reframe:** "The manifest declares no INTERNET permission, which is true and which is what we meant. But 'no INTERNET permission' and 'data never leaves the device' aren't the same statement, and we used the first to prove the second. Auto Backup is on and only the database is excluded, so the report PDF is backed up. It's a one-attribute fix — `allowBackup="false"` — and until we ship it, the sentence printed in the PDF is wrong."
+**Superseded (do not use) — reframe from the `allowBackup` era:** *"The manifest declares no
+INTERNET permission, which is true and which is what we meant. But 'no INTERNET permission' and
+'data never leaves the device' aren't the same statement..."* Both halves of that are now stale:
+`allowBackup` was fixed in `ce9989f`, and the manifest does declare INTERNET as of the sync
+feature. Saying the first sentence on stage hands a judge a ten-second disproof (`dumpsys
+package com.smartlease.edge`). Use the live answer at the top of Q17.
 
-> The PDF still prints *"Generated fully offline, on-device — no data left this phone."* on page one. After `ce9989f`, that sentence is true.
+> **Also superseded:** *"The PDF still prints 'Generated fully offline, on-device — no data left
+> this phone.' on page one."* It does not; see the PDF wording paragraph above.
 
 ### Q18. `[CHANGED]` "Why does an offline app want my precise location?"
 **It no longer asks (`a2ad9ae`).** `ACCESS_FINE_LOCATION` and `VIBRATE` are gone from the
-manifest and from the launch request. The app declares CAMERA and RECORD_AUDIO, nothing else.
-If asked why they were ever there:
+manifest and from the launch request. The runtime permissions the app asks a user for are CAMERA
+and RECORD_AUDIO — it also declares TRANSMIT_IR, and (since the sync feature) INTERNET and
+ACCESS_NETWORK_STATE, none of which prompt. Do not say "CAMERA and RECORD_AUDIO, nothing else";
+that was true before sync and a judge reading the manifest will see otherwise. If asked why
+location and vibrate were ever there:
 
 > "They were declared for features we never built — a geotagged report and haptic feedback. Neither was used, and on a pitch built around privacy they shouldn't have been in the manifest, so we removed them."
 

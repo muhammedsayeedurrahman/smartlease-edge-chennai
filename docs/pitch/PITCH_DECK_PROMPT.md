@@ -90,7 +90,10 @@ Slide order and required content:
 8  Architecture: one diagram, input layer (IMX921 camera, stereo mics, IR blaster, rotation/depth) →
    three lanes (Hexagon NPU: segmenter, tap CNN, Llama 3.2 3B via GenieX/QAIRT; Host CPU: NMS, area,
    Mel, PDF, SHA-256, Room DB; IR state machine: capture → store → replay → verify) → diagnostic synthesis
-   JSON → signed PDF (timestamp, session ID, SHA-256, dual signature). Badge: no INTERNET permission.
+   JSON → signed PDF (timestamp, session ID, SHA-256, dual signature). Badge: media never
+   leaves the device — structurally, not by promise (the upload type has no field that can
+   carry image bytes). Do NOT badge "no INTERNET permission": the app declares it for report
+   sync as of 2026-09-12, and the badge would be false.
 9  iQOO 15 hardware map: table of ≤7 rows, hardware / verified spec / exact job (NPU, triple 50 MP with
    OIS + ultrawide + periscope, IR blaster, stereo mics + Sensing Hub, 6000-nit display, 7000 mAh + 8K
    vapor chamber). Caveat: vivo Q3 co-processor not targeted (no public SDK).
@@ -125,7 +128,8 @@ Slide order and required content:
 - [ ] Replace phone mockups with real screenshots when the UI lands (Days 6–10); keep the "target UI" caption until then.
 - [ ] Replace the illustrative spectrogram with a real hollow/solid pair from your recordings after Day 5.
 - [ ] Latency numbers (<30 ms, <3 ms, ~15 s) are targets; after the Day 6–8 NPU tests, replace with measured values and drop the word "target".
-- [ ] Confirm the manifest has no INTERNET permission (slide 8 badge, slide 15 checkmark).
+- [ ] Confirm no slide claims the manifest lacks INTERNET — it declares it for report sync
+      (slide 8 badge, slide 15 checkmark both need the media-cannot-leave wording instead).
 - [ ] Sources slide: the ">40% of disputes" figure is an industry estimate from rental portals; say so if challenged. Do not reuse the earlier draft's ₹2,400 crore / 1.1 crore agreements / 38% figures; no source was found for them.
 - [ ] Keep the deck under 10 MB; export a PDF copy alongside the PPTX.
 
