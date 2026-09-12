@@ -52,10 +52,15 @@ class YoloSegDefectSegmenter private constructor(
         val frameSqFt = (frameWidthInches / 12f) * (frameHeightInches / 12f)
 
         return detections.map { d ->
-            val name = YoloSegConfig.CLASS_DESCRIPTIONS.getOrElse(d.classIndex) { "unclassified defect" }
+            val name = YoloSegConfig.classDescription(d.classIndex)
+            // The canonical key travels alongside the description rather than being recovered
+            // from it later: the rate card is keyed on this, and a reverse lookup from prose
+            // is exactly the fragile step this field removes.
+            val key = YoloSegConfig.classKey(d.classIndex)
             DefectSegmenter.Defect(
                 boundingBox = RectF(d.box.left, d.box.top, d.box.right, d.box.bottom),
                 label = name,
+                defectClass = key,
                 areaSqFtEstimate = d.coverageFraction * frameSqFt,
                 confidence = d.score
             )

@@ -61,7 +61,8 @@ class VideoInspectionCoordinator(
                         capturedRecords.add(
                             RoomDefectRecord(
                                 wall = wallName,
-                                defectClass = defect.label,
+                                defectClass = defect.defectClass,
+                                label = defect.label,
                                 areaSqFt = defect.areaSqFtEstimate,
                                 confidence = defect.confidence
                             )

@@ -23,15 +23,24 @@ object RepairTariff {
     data class Rate(
         val ratePerSqFtRupees: Int,
         val minimumRupees: Int,
-        val workDescription: String
+        val workDescription: String,
+        /**
+         * What the report calls this defect. Separate from the map key because the key is the
+         * model's dataset vocabulary (`damp_stain`) and a tenant-facing PDF must never print
+         * an underscore-cased label lifted straight out of a data.yaml.
+         */
+        val displayName: String
     )
 
-    /** Keyed by the YOLOv8n-Seg class name in `YoloSegConfig.CLASS_NAMES`. */
+    /**
+     * Keyed by the YOLOv8n-Seg class name in `YoloSegConfig.CLASS_NAMES` — the exact strings,
+     * not their descriptions. `RepairTariffCoverageTest` fails the build if the two drift.
+     */
     private val rateCard: Map<String, Rate> = mapOf(
-        "crack" to Rate(85, 1_500, "Crack routing, filling, plaster patch and repaint"),
-        "peeling" to Rate(45, 800, "Scrape, prime and repaint affected area"),
-        "spalling" to Rate(150, 2_000, "Cut back to sound substrate, re-render and repaint"),
-        "stain/mould" to Rate(60, 900, "Anti-fungal treatment, stain block and repaint")
+        "crack" to Rate(85, 1_500, "Crack routing, filling, plaster patch and repaint", "Crack in wall surface"),
+        "peeling" to Rate(45, 800, "Scrape, prime and repaint affected area", "Peeling paint"),
+        "spalling" to Rate(150, 2_000, "Cut back to sound substrate, re-render and repaint", "Spalling"),
+        "damp_stain" to Rate(60, 900, "Anti-fungal treatment, stain block and repaint", "Damp stain or mould")
     )
 
     /** Per-tile replacement, including lifting the failed tile and re-bedding. */

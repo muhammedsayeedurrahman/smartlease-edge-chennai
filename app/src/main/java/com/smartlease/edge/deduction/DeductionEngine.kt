@@ -102,10 +102,11 @@ object DeductionEngine {
 
     private fun visualLine(d: FindingDetail.VisualDefect): DeductionLine? {
         if (!isPriceable(d)) return null
+        val rate = RepairTariff.rateFor(d.defectClass) ?: return null
         val cost = RepairTariff.costOf(d.defectClass, d.areaSqFt) ?: return null
         val basis = RepairTariff.basisFor(d.defectClass, d.areaSqFt) ?: return null
         return DeductionLine(
-            description = d.defectClass.replaceFirstChar { it.uppercase() },
+            description = rate.displayName,
             basis = "$basis · detected at %.0f%% confidence".format(d.confidence * 100f),
             amountRupees = cost
         )
@@ -156,13 +157,21 @@ object DeductionEngine {
             "condition was not determined, no deduction."
     }
 
+    /**
+     * Reads to a tenant, so it uses the rate card's display name where one exists and falls
+     * back to the raw class only when the defect is genuinely unknown to the rate card —
+     * which is the one case where showing the raw string is the honest thing to do.
+     */
+    private fun visualName(d: FindingDetail.VisualDefect): String =
+        RepairTariff.rateFor(d.defectClass)?.displayName ?: d.defectClass
+
     private fun reviewNote(d: FindingDetail.VisualDefect): String = when {
         !d.fromTrainedModel ->
-            "${d.defectClass}: flagged by the colour heuristic, not the trained model — listed for human review, not priced."
+            "${visualName(d)}: flagged by the colour heuristic, not the trained model — listed for human review, not priced."
         RepairTariff.rateFor(d.defectClass) == null ->
-            "${d.defectClass}: no agreed rate for this defect type — listed for human review, not priced."
+            "${visualName(d)}: no agreed rate for this defect type — listed for human review, not priced."
         else ->
-            "${d.defectClass}: detected at %.0f%%, below the %.0f%% pricing threshold — listed for human review, not priced."
+            "${visualName(d)}: detected at %.0f%%, below the %.0f%% pricing threshold — listed for human review, not priced."
                 .format(d.confidence * 100f, PRICING_CONFIDENCE_FLOOR * 100f)
     }
 

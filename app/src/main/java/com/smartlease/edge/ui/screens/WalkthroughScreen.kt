@@ -48,6 +48,7 @@ import com.smartlease.edge.ui.theme.ReadoutValueLarge
 import com.smartlease.edge.vision.DefectSegmenter
 import com.smartlease.edge.vision.DefectSegmenterFactory
 import com.smartlease.edge.inspection360.HeadingTracker
+import com.smartlease.edge.inspection360.RoomDefectRecord
 import com.smartlease.edge.inspection360.RoomInspectionCoordinator
 import com.smartlease.edge.inspection360.WallInspectionAnalyzer
 import kotlinx.coroutines.Dispatchers
@@ -203,14 +204,14 @@ fun WalkthroughScreen(sessionType: SessionType, onReportGenerated: (InspectionRe
             isAutoCaptureMode = false
             scope.launch {
                 records.forEach { record ->
-                    if (record.defectClass == "CLEAR") {
+                    if (record.defectClass == RoomDefectRecord.CLEAR) {
                         findings = findings + LoggedFinding(
                             Lamp.PASS, record.wall, "clear", "Nothing flagged on this wall"
                         )
                     } else {
                         logFinding(
                             type = FindingType.VISUAL_DEFECT,
-                            label = "${record.wall}: ${record.defectClass}",
+                            label = "${record.wall}: ${record.label}",
                             value = "%.2f sq ft".format(record.areaSqFt),
                             detail = FindingDetail.VisualDefect(
                                 defectClass = record.defectClass,
@@ -447,7 +448,7 @@ fun WalkthroughScreen(sessionType: SessionType, onReportGenerated: (InspectionRe
                                     label = d.label,
                                     value = "%.2f sq ft".format(d.areaSqFtEstimate),
                                     detail = FindingDetail.VisualDefect(
-                                        defectClass = d.label,
+                                        defectClass = d.defectClass,
                                         areaSqFt = d.areaSqFtEstimate,
                                         confidence = d.confidence,
                                         fromTrainedModel = segmenter.isTrainedModel

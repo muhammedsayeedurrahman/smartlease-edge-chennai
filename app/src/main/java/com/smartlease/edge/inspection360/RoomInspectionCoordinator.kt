@@ -32,7 +32,8 @@ class RoomInspectionCoordinator(
                     capturedRecords.add(
                         RoomDefectRecord(
                             wall = quadrant.name,
-                            defectClass = defect.label,
+                            defectClass = defect.defectClass,
+                            label = defect.label,
                             areaSqFt = defect.areaSqFtEstimate,
                             confidence = defect.confidence
                         )
@@ -45,7 +46,8 @@ class RoomInspectionCoordinator(
                      capturedRecords.add(
                         RoomDefectRecord(
                             wall = quadrant.name,
-                            defectClass = "CLEAR",
+                            defectClass = RoomDefectRecord.CLEAR,
+                            label = RoomDefectRecord.CLEAR,
                             areaSqFt = 0f,
                             confidence = 1.0f
                         )

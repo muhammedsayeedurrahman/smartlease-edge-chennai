@@ -19,7 +19,20 @@ import android.graphics.RectF
  * that's the entire point of coding to this interface now.
  */
 interface DefectSegmenter {
-    data class Defect(val boundingBox: RectF, val label: String, val areaSqFtEstimate: Float, val confidence: Float)
+    /**
+     * @param label tenant-facing description, e.g. "crack in wall surface". Display only.
+     * @param defectClass canonical class key, e.g. "crack". This — never [label] — is what
+     *   the costing engine looks up, because the rate card is written in the model's own
+     *   vocabulary. Passing the description here prices nothing and fails silently, which
+     *   is exactly what happened before RepairTariffCoverageTest existed.
+     */
+    data class Defect(
+        val boundingBox: RectF,
+        val label: String,
+        val defectClass: String,
+        val areaSqFtEstimate: Float,
+        val confidence: Float
+    )
 
     /** @param frameWidthInches / frameHeightInches — real-world size of the photographed area, for sq-ft conversion. */
     fun segmentDefects(bitmap: Bitmap, frameWidthInches: Float, frameHeightInches: Float): List<Defect>
@@ -73,6 +86,9 @@ class HeuristicDefectSegmenter : DefectSegmenter {
             DefectSegmenter.Defect(
                 boundingBox = box,
                 label = "possible discoloration/damage (heuristic, unverified)",
+                // Deliberately not a model class name: a heuristic hit must never match the
+                // rate card, and `fromTrainedModel = false` already blocks pricing upstream.
+                defectClass = HEURISTIC_CLASS,
                 areaSqFtEstimate = areaSqFt,
                 confidence = 0.4f // deliberately capped low — this is a placeholder, not a trained detector
             )
@@ -89,5 +105,10 @@ class HeuristicDefectSegmenter : DefectSegmenter {
         val isDark = brightness < 90
         val isBrownish = r > g && g > b && (r - b) > 20
         return isDark || isBrownish
+    }
+
+    private companion object {
+        /** Not a model class, and deliberately absent from the rate card. */
+        const val HEURISTIC_CLASS = "possible discoloration/damage"
     }
 }
