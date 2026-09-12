@@ -10,8 +10,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -54,11 +54,11 @@ fun RoomConfigScreen(
                 title = { Text("${room.type} Config", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
+                    containerColor = MaterialTheme.colorScheme.background,
                     titleContentColor = MaterialTheme.colorScheme.onBackground,
                     navigationIconContentColor = MaterialTheme.colorScheme.onBackground
                 )
@@ -78,23 +78,24 @@ fun RoomConfigScreen(
 
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Box(modifier = Modifier.weight(1f)) {
-                    GlassTextField(value = width, onValueChange = { width = it }, label = "Width (ft)", keyboardType = KeyboardType.Number)
+                    CorporateTextField(value = width, onValueChange = { width = it }, label = "Width (ft)", keyboardType = KeyboardType.Number)
                 }
                 Box(modifier = Modifier.weight(1f)) {
-                    GlassTextField(value = length, onValueChange = { length = it }, label = "Length (ft)", keyboardType = KeyboardType.Number)
+                    CorporateTextField(value = length, onValueChange = { length = it }, label = "Length (ft)", keyboardType = KeyboardType.Number)
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Box(modifier = Modifier.weight(1f)) {
-                    GlassTextField(value = height, onValueChange = { height = it }, label = "Height (ft)", keyboardType = KeyboardType.Number)
+                    CorporateTextField(value = height, onValueChange = { height = it }, label = "Height (ft)", keyboardType = KeyboardType.Number)
                 }
                 Box(modifier = Modifier.weight(1f)) {
-                    GlassTextField(value = sqFt, onValueChange = { sqFt = it }, label = "Total Sq Ft", keyboardType = KeyboardType.Number)
+                    CorporateTextField(value = sqFt, onValueChange = { sqFt = it }, label = "Total Sq Ft", keyboardType = KeyboardType.Number)
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
-            GlassTextField(value = damages, onValueChange = { damages = it }, label = "Pre-existing Damages (Optional)")
+            CorporateTextField(value = damages, onValueChange = { damages = it }, label = "Pre-existing Damages (Optional)")
+
 
             Spacer(modifier = Modifier.height(32.dp))
             
@@ -107,7 +108,7 @@ fun RoomConfigScreen(
                     .fillMaxWidth()
                     .height(200.dp)
                     .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .background(MaterialTheme.colorScheme.surface)
                     .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp)),
                 contentAlignment = Alignment.Center
             ) {
@@ -132,13 +133,13 @@ fun RoomConfigScreen(
                     val offsetY = (maxCanvasHeight - rectH) / 2
 
                     drawRect(
-                        color = com.smartlease.edge.ui.theme.IqooYellow.copy(alpha = 0.3f),
+                        color = com.smartlease.edge.ui.theme.CorporateYellow.copy(alpha = 0.3f),
                         topLeft = Offset(offsetX, offsetY),
                         size = Size(rectW, rectH)
                     )
                     
                     drawRect(
-                        color = com.smartlease.edge.ui.theme.IqooYellow,
+                        color = com.smartlease.edge.ui.theme.CorporateYellow,
                         topLeft = Offset(offsetX, offsetY),
                         size = Size(rectW, rectH),
                         style = Stroke(width = 4.dp.toPx())
@@ -192,18 +193,15 @@ fun SurfaceRecordCard(
     defectCount: Int = 0,
     onClick: () -> Unit
 ) {
-    Card(
+    ElevatedCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(if (isRecorded) com.smartlease.edge.ui.theme.LampGreen.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surfaceVariant)
-            .clickable { onClick() }
-            .border(
-                1.dp, 
-                if (isRecorded) com.smartlease.edge.ui.theme.LampGreen.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outline, 
-                RoundedCornerShape(12.dp)
-            ),
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+            .clickable { onClick() },
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = if (isRecorded) com.smartlease.edge.ui.theme.LampGreen.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
@@ -234,7 +232,7 @@ fun SurfaceRecordCard(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Default.CameraAlt,
+                    imageVector = Icons.Rounded.CameraAlt,
                     contentDescription = "Record",
                     tint = if (isRecorded) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onPrimary
                 )

@@ -13,8 +13,8 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -41,13 +41,13 @@ fun PropertyDashboardScreen(
     val rooms = viewModel.getRoomsForProperty(propertyId)
 
     val roomCategories = listOf(
-        "Hall" to Icons.Default.Weekend,
-        "Room" to Icons.Default.Bed,
-        "Kitchen" to Icons.Default.Countertops,
-        "Bathroom" to Icons.Default.Bathtub,
-        "Balcony" to Icons.Default.Deck,
-        "Garden" to Icons.Default.Yard,
-        "Outer" to Icons.Default.Fence
+        "Hall" to Icons.Rounded.Weekend,
+        "Room" to Icons.Rounded.Bed,
+        "Kitchen" to Icons.Rounded.Countertops,
+        "Bathroom" to Icons.Rounded.Bathtub,
+        "Balcony" to Icons.Rounded.Deck,
+        "Garden" to Icons.Rounded.Yard,
+        "Outer" to Icons.Rounded.Fence
     )
 
     Scaffold(
@@ -56,11 +56,11 @@ fun PropertyDashboardScreen(
                 title = { Text(property?.name ?: "Property", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
+                    containerColor = MaterialTheme.colorScheme.background,
                     titleContentColor = MaterialTheme.colorScheme.onBackground,
                     navigationIconContentColor = MaterialTheme.colorScheme.onBackground
                 )
@@ -132,7 +132,7 @@ fun RoomCategoryIcon(title: String, icon: ImageVector, onClick: () -> Unit) {
         Box(
             modifier = Modifier
                 .size(60.dp)
-                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
                 .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp)),
             contentAlignment = Alignment.Center
         ) {
@@ -147,14 +147,13 @@ fun RoomCategoryIcon(title: String, icon: ImageVector, onClick: () -> Unit) {
 fun RoomListItem(room: Room, onClick: () -> Unit) {
     val isComplete = room.topRecorded && room.bottomRecorded && room.sidesRecorded
     
-    Card(
+    ElevatedCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .clickable { onClick() }
-            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp)),
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+            .clickable { onClick() },
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp)
     ) {
         Row(
             modifier = Modifier.padding(16.dp),

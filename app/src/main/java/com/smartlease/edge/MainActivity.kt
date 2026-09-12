@@ -1,6 +1,7 @@
 package com.smartlease.edge
 
 import android.Manifest
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -8,6 +9,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavType
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -34,19 +37,52 @@ class MainActivity : ComponentActivity() {
             )
         )
 
+        val sharedPrefs = getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
+        val isFirstLaunch = sharedPrefs.getBoolean("is_first_launch", true)
+
         setContent {
             SmartLeaseEdgeTheme {
-                SmartLeaseApp(appViewModel)
+                SmartLeaseApp(
+                    viewModel = appViewModel,
+                    isFirstLaunch = isFirstLaunch,
+                    onFirstLaunchComplete = {
+                        sharedPrefs.edit().putBoolean("is_first_launch", false).apply()
+                    }
+                )
             }
         }
     }
 }
 
 @Composable
-fun SmartLeaseApp(viewModel: AppViewModel) {
+fun SmartLeaseApp(
+    viewModel: AppViewModel,
+    isFirstLaunch: Boolean = false,
+    onFirstLaunchComplete: () -> Unit = {}
+) {
     val navController = rememberNavController()
 
-    NavHost(navController = navController, startDestination = "home") {
+    val startDestination = if (isFirstLaunch) "welcome" else "home"
+
+    NavHost(
+        navController = navController,
+        startDestination = startDestination,
+        enterTransition = { fadeIn() },
+        exitTransition = { fadeOut() },
+        popEnterTransition = { fadeIn() },
+        popExitTransition = { fadeOut() }
+    ) {
+        composable("welcome") {
+            WelcomeScreen(
+                onCreateProperty = { isFlat ->
+                    onFirstLaunchComplete()
+                    navController.navigate("home") {
+                        popUpTo("welcome") { inclusive = true }
+                    }
+                    navController.navigate("create_property/$isFlat")
+                }
+            )
+        }
         composable("home") {
             HomeScreen(
                 viewModel = viewModel,

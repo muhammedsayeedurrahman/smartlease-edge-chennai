@@ -17,12 +17,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Stop
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,7 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -216,7 +216,7 @@ fun VideoCaptureScreen(
                 onClick = onExit,
                 modifier = Modifier.background(com.smartlease.edge.ui.theme.GlassUnified, CircleShape)
             ) {
-                Icon(Icons.Default.Close, contentDescription = "Exit", tint = Color.White)
+                Icon(Icons.Rounded.Close, contentDescription = "Exit", tint = Color.White)
             }
             
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -306,7 +306,7 @@ fun VideoCaptureScreen(
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "${capturedFrames.size} frames",
-                        color = com.smartlease.edge.ui.theme.IqooYellow,
+                        color = com.smartlease.edge.ui.theme.CorporateYellow,
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold
                     )
@@ -322,7 +322,7 @@ fun VideoCaptureScreen(
                     .padding(horizontal = 40.dp, vertical = 120.dp)
                     .border(
                         1.dp,
-                        if (recordingState == RecordingState.RECORDING) com.smartlease.edge.ui.theme.IqooYellow.copy(alpha = 0.5f)
+                        if (recordingState == RecordingState.RECORDING) com.smartlease.edge.ui.theme.CorporateYellow.copy(alpha = 0.5f)
                         else Color.White.copy(alpha = 0.25f),
                         RoundedCornerShape(16.dp)
                     )
@@ -352,7 +352,7 @@ fun VideoCaptureScreen(
                         Text(
                             text = "LIVE FRAMES",
                             style = MaterialTheme.typography.labelSmall,
-                            color = com.smartlease.edge.ui.theme.IqooYellow,
+                            color = com.smartlease.edge.ui.theme.CorporateYellow,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(end = 8.dp)
                         )
@@ -414,7 +414,7 @@ fun VideoCaptureScreen(
                             modifier = Modifier.size(48.dp).background(com.smartlease.edge.ui.theme.GlassUnified, CircleShape)
                         ) {
                             Icon(
-                                imageVector = if (recordingState == RecordingState.RECORDING) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                imageVector = if (recordingState == RecordingState.RECORDING) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                                 contentDescription = "Pause/Resume",
                                 tint = Color.White
                             )
@@ -462,7 +462,7 @@ fun VideoCaptureScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         if (recordingState != RecordingState.IDLE) {
-                            Icon(Icons.Default.Stop, contentDescription = "Stop", tint = com.smartlease.edge.ui.theme.LampRed, modifier = Modifier.size(36.dp))
+                            Icon(Icons.Rounded.Stop, contentDescription = "Stop", tint = com.smartlease.edge.ui.theme.LampRed, modifier = Modifier.size(36.dp))
                         }
                     }
                     
@@ -573,7 +573,7 @@ fun VideoCaptureScreen(
                                     .clip(RoundedCornerShape(10.dp))
                                     .border(
                                         width = if (isSelected) 2.dp else 1.dp,
-                                        color = if (isSelected) com.smartlease.edge.ui.theme.IqooYellow else com.smartlease.edge.ui.theme.BorderUnified,
+                                        color = if (isSelected) com.smartlease.edge.ui.theme.CorporateYellow else com.smartlease.edge.ui.theme.BorderUnified,
                                         shape = RoundedCornerShape(10.dp)
                                     )
                                     .clickable { selectedFrameIndex = idx }
@@ -602,7 +602,7 @@ fun VideoCaptureScreen(
                     ) {
                         if (activeFrame.defects.isEmpty()) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.CheckCircle, contentDescription = "Clean", tint = com.smartlease.edge.ui.theme.LampGreen, modifier = Modifier.size(20.dp))
+                                Icon(Icons.Rounded.CheckCircle, contentDescription = "Clean", tint = com.smartlease.edge.ui.theme.LampGreen, modifier = Modifier.size(20.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     "No defects detected on this frame",
@@ -623,7 +623,7 @@ fun VideoCaptureScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.padding(bottom = 6.dp)
                                 ) {
-                                    Icon(Icons.Default.Warning, contentDescription = "Defect", tint = com.smartlease.edge.ui.theme.LampAmber, modifier = Modifier.size(18.dp))
+                                    Icon(Icons.Rounded.Warning, contentDescription = "Defect", tint = com.smartlease.edge.ui.theme.LampAmber, modifier = Modifier.size(18.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Column {
                                         Text(
@@ -649,7 +649,7 @@ fun VideoCaptureScreen(
                 // Action Buttons
                 Button(
                     onClick = onExit,
-                    colors = ButtonDefaults.buttonColors(containerColor = com.smartlease.edge.ui.theme.IqooYellow, contentColor = Color.Black),
+                    colors = ButtonDefaults.buttonColors(containerColor = com.smartlease.edge.ui.theme.CorporateYellow, contentColor = Color.Black),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth().height(48.dp)
                 ) {

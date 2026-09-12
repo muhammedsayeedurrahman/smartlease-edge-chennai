@@ -4,7 +4,7 @@ import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
-import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.platform.LocalView
@@ -14,20 +14,19 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
-// We force the unified dark Carbon Black aesthetic across both Light and Dark systems
-// to maintain the premium iQOO Hackathon brand consistency.
-private val UnifiedProColors = darkColorScheme(
-    primary = IqooYellow,
+// Professional Light Theme for Corporate use
+private val CorporateLightColors = lightColorScheme(
+    primary = CorporateYellow,
     onPrimary = PureBlack,
-    secondary = IqooYellow,
+    secondary = CorporateYellow,
     onSecondary = PureBlack,
-    background = CarbonBlack,
-    onBackground = TextPrimaryUnified,
-    surface = SurfaceUnified,
-    onSurface = TextPrimaryUnified,
-    surfaceVariant = GlassUnified,
-    onSurfaceVariant = TextSecondaryUnified,
-    outline = BorderUnified,
+    background = PureWhite,
+    onBackground = TextPrimaryDark,
+    surface = SurfaceLight,
+    onSurface = TextPrimaryDark,
+    surfaceVariant = SurfaceVariantLight,
+    onSurfaceVariant = TextSecondaryDark,
+    outline = BorderLight,
     error = LampRed,
     onError = PureWhite
 )
@@ -81,20 +80,20 @@ private val AppTypography = Typography(
 
 @Composable
 fun SmartLeaseEdgeTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(), // Ignored, we enforce UnifiedProColors
+    darkTheme: Boolean = isSystemInDarkTheme(), 
     content: @Composable () -> Unit
 ) {
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            // Always set light status bars to false because our background is always Dark Carbon
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
+            // Use light status bars (dark icons) because our background is Light White/Gray
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = true
         }
     }
 
     MaterialTheme(
-        colorScheme = UnifiedProColors,
+        colorScheme = CorporateLightColors,
         typography = AppTypography,
         content = content
     )

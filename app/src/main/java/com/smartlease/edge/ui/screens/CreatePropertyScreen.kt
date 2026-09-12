@@ -8,7 +8,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -40,11 +40,11 @@ fun CreatePropertyScreen(
                 title = { Text(if (isFlat) "New Flat" else "New Home", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
+                    containerColor = MaterialTheme.colorScheme.background,
                     titleContentColor = MaterialTheme.colorScheme.onBackground,
                     navigationIconContentColor = MaterialTheme.colorScheme.onBackground
                 )
@@ -67,28 +67,28 @@ fun CreatePropertyScreen(
             )
             Spacer(modifier = Modifier.height(24.dp))
 
-            GlassTextField(
+            CorporateTextField(
                 value = propertyName,
                 onValueChange = { propertyName = it },
                 label = "Property Name (e.g. Flat 3B)"
             )
             Spacer(modifier = Modifier.height(16.dp))
 
-            GlassTextField(
+            CorporateTextField(
                 value = location,
                 onValueChange = { location = it },
                 label = "Location"
             )
             Spacer(modifier = Modifier.height(16.dp))
 
-            GlassTextField(
+            CorporateTextField(
                 value = tenantName,
                 onValueChange = { tenantName = it },
                 label = "Tenant Name (Optional)"
             )
             Spacer(modifier = Modifier.height(16.dp))
 
-            GlassTextField(
+            CorporateTextField(
                 value = deposit,
                 onValueChange = { deposit = it },
                 label = "Deposit Amount (Optional)",
@@ -119,14 +119,14 @@ fun CreatePropertyScreen(
                     .fillMaxWidth()
                     .height(56.dp)
             ) {
-                Text("Save & Proceed →", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text("Save & Proceed →", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.Black)
             }
         }
     }
 }
 
 @Composable
-fun GlassTextField(
+fun CorporateTextField(
     value: String,
     onValueChange: (String) -> Unit,
     label: String,
@@ -140,10 +140,10 @@ fun GlassTextField(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant),
+            .background(MaterialTheme.colorScheme.surface),
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = MaterialTheme.colorScheme.primary,
-            unfocusedBorderColor = Color.Transparent,
+            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
             focusedTextColor = MaterialTheme.colorScheme.onBackground,
             unfocusedTextColor = MaterialTheme.colorScheme.onBackground
         ),
