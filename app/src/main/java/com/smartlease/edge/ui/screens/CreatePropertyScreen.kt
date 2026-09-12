@@ -130,11 +130,13 @@ fun CorporateTextField(
     value: String,
     onValueChange: (String) -> Unit,
     label: String,
-    keyboardType: KeyboardType = KeyboardType.Text
+    keyboardType: KeyboardType = KeyboardType.Text,
+    readOnly: Boolean = false
 ) {
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
+        readOnly = readOnly,
         label = { Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant) },
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
         modifier = Modifier

@@ -73,10 +73,14 @@ pytorch-torchvision-lite = { group = "org.pytorch", name = "pytorch_android_torc
 androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
-
+sqlcipher = { group = "net.zetetic", name = "android-database-sqlcipher", version = "4.5.4" }
+androidx-sqlite-ktx = { group = "androidx.sqlite", name = "sqlite-ktx", version = "2.4.0" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxJunit" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
+arcore = { group = "com.google.ar", name = "core", version = "1.41.0" }
+sceneview = { group = "io.github.sceneview", name = "sceneview", version = "2.1.1" }
+arsceneview = { group = "io.github.sceneview", name = "arsceneview", version = "2.1.1" }
 
 # Backend sync client (com.smartlease.edge.sync). Server stores only a digest + metadata --
 # this stack never carries a bitmap/byte-array field, by construction of the DTOs.

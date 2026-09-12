@@ -37,15 +37,32 @@ fun RoomConfigScreen(
 ) {
     val room = viewModel.rooms.find { it.id == roomId } ?: return
     
+    var roomName by remember { mutableStateOf(room.type) }
     var sqFt by remember { mutableStateOf(room.sqFt) }
     var height by remember { mutableStateOf(room.height) }
     var width by remember { mutableStateOf(room.width) }
     var length by remember { mutableStateOf(room.length) }
     var damages by remember { mutableStateOf(room.damages) }
 
+    // Dynamic square footage calculation
+    LaunchedEffect(width, length, height) {
+        val w = width.toDoubleOrNull() ?: 0.0
+        val l = length.toDoubleOrNull() ?: 0.0
+        val h = height.toDoubleOrNull()
+        if (w > 0 && l > 0) {
+            sqFt = if (h != null && h > 0) {
+                String.format("%.2f", w * l * h)
+            } else {
+                String.format("%.2f", w * l)
+            }
+        } else {
+            sqFt = ""
+        }
+    }
+
     // Save changes to ViewModel whenever they update
-    LaunchedEffect(sqFt, height, width, length, damages) {
-        viewModel.updateRoom(room.copy(sqFt = sqFt, height = height, width = width, length = length, damages = damages))
+    LaunchedEffect(roomName, sqFt, height, width, length, damages) {
+        viewModel.updateRoom(room.copy(type = roomName, sqFt = sqFt, height = height, width = width, length = length, damages = damages))
     }
 
     Scaffold(
@@ -76,6 +93,9 @@ fun RoomConfigScreen(
             Text("Dimensions", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
             Spacer(modifier = Modifier.height(16.dp))
 
+            CorporateTextField(value = roomName, onValueChange = { roomName = it }, label = "Area Name")
+            Spacer(modifier = Modifier.height(16.dp))
+
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Box(modifier = Modifier.weight(1f)) {
                     CorporateTextField(value = width, onValueChange = { width = it }, label = "Width (ft)", keyboardType = KeyboardType.Number)
@@ -90,7 +110,13 @@ fun RoomConfigScreen(
                     CorporateTextField(value = height, onValueChange = { height = it }, label = "Height (ft)", keyboardType = KeyboardType.Number)
                 }
                 Box(modifier = Modifier.weight(1f)) {
-                    CorporateTextField(value = sqFt, onValueChange = { sqFt = it }, label = "Total Sq Ft", keyboardType = KeyboardType.Number)
+                    CorporateTextField(
+                        value = sqFt, 
+                        onValueChange = {}, 
+                        label = "Total Sq Ft", 
+                        keyboardType = KeyboardType.Number,
+                        readOnly = true
+                    )
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -102,11 +128,11 @@ fun RoomConfigScreen(
             Text("2D Blueprint Viewer", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
             Spacer(modifier = Modifier.height(16.dp))
             
-            // Blueprint Canvas
+            // Blueprint Canvas (Pseudo-3D)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(200.dp)
+                    .height(250.dp)
                     .clip(RoundedCornerShape(16.dp))
                     .background(MaterialTheme.colorScheme.surface)
                     .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp)),
@@ -114,36 +140,81 @@ fun RoomConfigScreen(
             ) {
                 val w = width.toFloatOrNull() ?: 10f
                 val l = length.toFloatOrNull() ?: 15f
+                val h = height.toFloatOrNull() ?: 0f
                 
                 Canvas(modifier = Modifier.fillMaxSize().padding(32.dp)) {
-                    // Calculate proportional size
-                    val maxCanvasWidth = size.width
-                    val maxCanvasHeight = size.height
+                    val maxW = size.width
+                    val maxH = size.height
                     
-                    val ratio = w / l
-                    val canvasRatio = maxCanvasWidth / maxCanvasHeight
-                    
-                    val (rectW, rectH) = if (ratio > canvasRatio) {
-                        maxCanvasWidth to (maxCanvasWidth / ratio)
+                    if (h <= 0f) {
+                        // 2D Draw
+                        val ratio = w / l
+                        val canvasRatio = maxW / maxH
+                        val (rectW, rectH) = if (ratio > canvasRatio) maxW to (maxW / ratio) else (maxH * ratio) to maxH
+                        val offsetX = (maxW - rectW) / 2
+                        val offsetY = (maxH - rectH) / 2
+                        drawRect(com.smartlease.edge.ui.theme.CorporateYellow.copy(alpha = 0.3f), Offset(offsetX, offsetY), Size(rectW, rectH))
+                        drawRect(com.smartlease.edge.ui.theme.CorporateYellow, Offset(offsetX, offsetY), Size(rectW, rectH), style = Stroke(4.dp.toPx()))
                     } else {
-                        (maxCanvasHeight * ratio) to maxCanvasHeight
+                        // Pseudo-3D Isometric Draw
+                        val scale = minOf(maxW / (w + l * 0.5f), maxH / (h + l * 0.5f)) * 0.8f
+                        
+                        val scaledW = w * scale
+                        val scaledL = l * scale
+                        val scaledH = h * scale
+                        
+                        // Iso offsets
+                        val isoDx = scaledL * 0.5f
+                        val isoDy = scaledL * 0.5f
+                        
+                        val cx = maxW / 2 - (scaledW + isoDx) / 2
+                        val cy = maxH / 2 - (scaledH + isoDy) / 2 + scaledH
+                        
+                        // Front face
+                        val p1 = Offset(cx, cy)
+                        val p2 = Offset(cx + scaledW, cy)
+                        val p3 = Offset(cx + scaledW, cy - scaledH)
+                        val p4 = Offset(cx, cy - scaledH)
+                        
+                        // Back face
+                        val p5 = Offset(cx + isoDx, cy - isoDy)
+                        val p6 = Offset(cx + scaledW + isoDx, cy - isoDy)
+                        val p7 = Offset(cx + scaledW + isoDx, cy - scaledH - isoDy)
+                        val p8 = Offset(cx + isoDx, cy - scaledH - isoDy)
+                        
+                        // Draw filled faces
+                        val path = androidx.compose.ui.graphics.Path()
+                        
+                        // Floor
+                        path.moveTo(p1.x, p1.y); path.lineTo(p2.x, p2.y); path.lineTo(p6.x, p6.y); path.lineTo(p5.x, p5.y); path.close()
+                        drawPath(path, com.smartlease.edge.ui.theme.CorporateYellow.copy(alpha = 0.4f))
+                        
+                        // Left Wall
+                        path.reset(); path.moveTo(p1.x, p1.y); path.lineTo(p4.x, p4.y); path.lineTo(p8.x, p8.y); path.lineTo(p5.x, p5.y); path.close()
+                        drawPath(path, com.smartlease.edge.ui.theme.CorporateYellow.copy(alpha = 0.2f))
+                        
+                        // Draw Wireframe Lines
+                        val color = com.smartlease.edge.ui.theme.CorporateYellow
+                        val stroke = Stroke(3.dp.toPx())
+                        
+                        // Front
+                        drawLine(color, p1, p2, strokeWidth = stroke.width)
+                        drawLine(color, p2, p3, strokeWidth = stroke.width)
+                        drawLine(color, p3, p4, strokeWidth = stroke.width)
+                        drawLine(color, p4, p1, strokeWidth = stroke.width)
+                        
+                        // Back
+                        drawLine(color.copy(alpha = 0.3f), p5, p6, strokeWidth = stroke.width)
+                        drawLine(color, p6, p7, strokeWidth = stroke.width)
+                        drawLine(color, p7, p8, strokeWidth = stroke.width)
+                        drawLine(color.copy(alpha = 0.3f), p8, p5, strokeWidth = stroke.width)
+                        
+                        // Connecting edges
+                        drawLine(color.copy(alpha = 0.3f), p1, p5, strokeWidth = stroke.width)
+                        drawLine(color, p2, p6, strokeWidth = stroke.width)
+                        drawLine(color, p3, p7, strokeWidth = stroke.width)
+                        drawLine(color, p4, p8, strokeWidth = stroke.width)
                     }
-
-                    val offsetX = (maxCanvasWidth - rectW) / 2
-                    val offsetY = (maxCanvasHeight - rectH) / 2
-
-                    drawRect(
-                        color = com.smartlease.edge.ui.theme.CorporateYellow.copy(alpha = 0.3f),
-                        topLeft = Offset(offsetX, offsetY),
-                        size = Size(rectW, rectH)
-                    )
-                    
-                    drawRect(
-                        color = com.smartlease.edge.ui.theme.CorporateYellow,
-                        topLeft = Offset(offsetX, offsetY),
-                        size = Size(rectW, rectH),
-                        style = Stroke(width = 4.dp.toPx())
-                    )
                 }
             }
 

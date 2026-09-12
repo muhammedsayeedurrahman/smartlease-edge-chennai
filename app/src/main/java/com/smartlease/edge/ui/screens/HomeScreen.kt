@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Apartment
+import androidx.compose.material.icons.rounded.CloudUpload
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.House
 import androidx.compose.material.icons.rounded.Info
@@ -47,6 +48,9 @@ fun HomeScreen(
                     // ones asked before anyone has recorded anything.
                     IconButton(onClick = onOpenSelfTest) {
                         Icon(Icons.Rounded.Info, contentDescription = "Self-test")
+                    }
+                    IconButton(onClick = { /* TODO: Open Google Drive Backup BottomSheet */ }) {
+                        Icon(Icons.Rounded.CloudUpload, contentDescription = "Google Drive Backup")
                     }
                     var expanded by remember { mutableStateOf(false) }
                     Box {

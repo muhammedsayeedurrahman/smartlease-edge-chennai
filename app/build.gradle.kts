@@ -135,6 +135,12 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
+    implementation(libs.sqlcipher)
+    implementation(libs.androidx.sqlite.ktx)
+
+    implementation(libs.arcore)
+    implementation(libs.sceneview)
+    implementation(libs.arsceneview)
 
     // On-device inference for the team's trained .ptl models
     implementation(libs.pytorch.android.lite)

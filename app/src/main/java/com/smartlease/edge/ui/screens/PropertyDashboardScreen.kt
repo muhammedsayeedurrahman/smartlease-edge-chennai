@@ -51,8 +51,19 @@ fun PropertyDashboardScreen(
         "Bathroom" to Icons.Rounded.Bathtub,
         "Balcony" to Icons.Rounded.Deck,
         "Garden" to Icons.Rounded.Yard,
-        "Outer" to Icons.Rounded.Fence
+        "Outer" to Icons.Rounded.Fence,
+        "Custom" to Icons.Rounded.AddBox
     )
+
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val documentPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            android.widget.Toast.makeText(context, "File Selected: $uri", android.widget.Toast.LENGTH_SHORT).show()
+            // TODO: Save to RentalAgreementEntity and run Gemma analysis
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -61,6 +72,11 @@ fun PropertyDashboardScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { documentPickerLauncher.launch("application/pdf") }) {
+                        Icon(Icons.Rounded.Add, contentDescription = "Upload Rental Agreement")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -125,24 +141,36 @@ fun PropertyDashboardScreen(
                 // Without this the capture flow had no exit: areas could be recorded
                 // indefinitely and nothing ever produced the report, PDF, digest, or
                 // countersignature the whole product exists to produce.
+                // Determine inspection state (Placeholder logic)
+                val isMoveInComplete = rooms.isNotEmpty() && rooms.all { it.frames.isNotEmpty() }
+                val isMoveOutComplete = false // TODO: Check if move out videos exist
+
+                val buttonText = when {
+                    isMoveOutComplete -> "Generate report"
+                    isMoveInComplete -> "Move Out"
+                    else -> "Complete Move-In First"
+                }
+
                 Button(
-                    onClick = { askingSessionType = true },
+                    onClick = { 
+                        if (isMoveOutComplete) {
+                            onGenerateReport(SessionType.MOVE_OUT)
+                        } else if (isMoveInComplete) {
+                            // Start Move Out Phase
+                            askingSessionType = true
+                        }
+                    },
                     enabled = capturedDefectCount > 0,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Generate report")
+                    Text(buttonText)
                 }
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     if (capturedDefectCount > 0) {
-                        "$capturedDefectCount finding(s) across ${rooms.size} area(s) will be " +
-                            "written up, priced against the deposit, and digest-stamped."
+                        "Workflow State: ${if (isMoveInComplete) "Move-In Complete. Ready for Move-Out." else "Recording Move-In phase."}"
                     } else {
-                        // Stating the actual precondition beats a disabled button with no
-                        // explanation -- and it must not imply the areas were inspected and
-                        // found clean, only that nothing has been detected yet.
-                        "Record an area first. A report is only produced once the camera has " +
-                            "flagged at least one defect -- nothing here is written up by hand."
+                        "Record an area first to establish the Move-In baseline."
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant

@@ -7,7 +7,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+import kotlinx.coroutines.withContext
 import com.smartlease.edge.vision.DefectSegmenter
 import com.smartlease.edge.vision.DefectSegmenterFactory
 import com.smartlease.edge.vision.HeuristicDefectSegmenter
@@ -68,13 +70,44 @@ sealed interface SegmenterState {
     data class Ready(val segmenter: DefectSegmenter) : SegmenterState
 }
 
-class AppViewModel : ViewModel() {
+class AppViewModel(application: Application) : AndroidViewModel(application) {
     val properties = mutableStateListOf<Property>()
     val rooms = mutableStateListOf<Room>()
+
+    private val dao = com.smartlease.edge.data.AppDatabase.get(application).propertyDao()
 
     // Off-main-thread home for the one-time vision-model bring-up. Cancelled in onCleared()
     // so no load work outlives this ViewModel.
     private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    init {
+        
+        // Load properties and rooms from the database
+        backgroundScope.launch {
+            val dbProperties = dao.getAllProperties()
+            val mappedProps = dbProperties.map {
+                Property(it.id, it.name, it.address, it.tenantName, it.depositAmount.toString(), it.isFlat)
+            }
+            
+            val allRooms = mutableListOf<Room>()
+            for (p in dbProperties) {
+                val dbRooms = dao.getAreasForProperty(p.id)
+                allRooms.addAll(dbRooms.map {
+                    Room(it.id, it.propertyId, it.name, 
+                         sqFt = if (it.height != null) "${it.length * it.breadth * it.height}" else "${it.length * it.breadth}",
+                         length = it.length.toString(), width = it.breadth.toString(), height = it.height?.toString() ?: "")
+                })
+            }
+            withContext(Dispatchers.Main) {
+                properties.clear()
+                properties.addAll(mappedProps)
+                rooms.clear()
+                rooms.addAll(allRooms)
+            }
+        }
+    }
+
+
 
     var segmenterState: SegmenterState by mutableStateOf(SegmenterState.Loading)
         private set
@@ -116,16 +149,46 @@ class AppViewModel : ViewModel() {
 
     fun addProperty(property: Property) {
         properties.add(property)
+        backgroundScope.launch {
+            dao.insertProperty(com.smartlease.edge.data.PropertyEntity(
+                id = property.id,
+                name = property.name,
+                address = property.location,
+                tenantName = property.tenantName,
+                depositAmount = property.depositAmount.toDoubleOrNull() ?: 0.0,
+                isFlat = property.isFlat
+            ))
+        }
     }
 
     fun addRoom(room: Room) {
         rooms.add(room)
+        backgroundScope.launch {
+            dao.insertArea(com.smartlease.edge.data.AreaEntity(
+                id = room.id,
+                propertyId = room.propertyId,
+                name = room.type,
+                length = room.length.toDoubleOrNull() ?: 0.0,
+                breadth = room.width.toDoubleOrNull() ?: 0.0,
+                height = room.height.toDoubleOrNull()
+            ))
+        }
     }
 
     fun updateRoom(updatedRoom: Room) {
         val index = rooms.indexOfFirst { it.id == updatedRoom.id }
         if (index != -1) {
             rooms[index] = updatedRoom
+            backgroundScope.launch {
+                dao.insertArea(com.smartlease.edge.data.AreaEntity(
+                    id = updatedRoom.id,
+                    propertyId = updatedRoom.propertyId,
+                    name = updatedRoom.type,
+                    length = updatedRoom.length.toDoubleOrNull() ?: 0.0,
+                    breadth = updatedRoom.width.toDoubleOrNull() ?: 0.0,
+                    height = updatedRoom.height.toDoubleOrNull()
+                ))
+            }
         }
     }
     
