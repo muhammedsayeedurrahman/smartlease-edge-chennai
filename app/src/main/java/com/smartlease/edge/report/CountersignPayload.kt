@@ -34,7 +34,8 @@ object CountersignPayload {
         val digestHex: String,
         val signatureBase64: String,
         val certificateBase64: String,
-        val hardwareBacked: Boolean
+        /** As claimed by the signing device itself -- see [Parsed.Resp.hardwareBackedSelfReported]. */
+        val hardwareBackedSelfReported: Boolean
     ) {
         fun toJson(): String = JSONObject()
             .put("t", TYPE_RESPONSE)
@@ -42,7 +43,7 @@ object CountersignPayload {
             .put("d", digestHex)
             .put("sig", signatureBase64)
             .put("cert", certificateBase64)
-            .put("hw", hardwareBacked)
+            .put("hw", hardwareBackedSelfReported)
             .toString()
     }
 
@@ -53,7 +54,14 @@ object CountersignPayload {
             val digestHex: String,
             val signatureBase64: String,
             val certificateBase64: String,
-            val hardwareBacked: Boolean
+            /**
+             * Whatever the responding device's own [ReportSigner.Attestation.hardwareBacked]
+             * said about itself at signing time -- carried over the wire as plain JSON, so it
+             * is exactly as trustworthy as the device that sent it. This receiving side never
+             * validates the certificate chain against a hardware attestation root, so this
+             * field must not be presented as a verified fact; it is what the other phone claims.
+             */
+            val hardwareBackedSelfReported: Boolean
         ) : Parsed
     }
 
@@ -73,7 +81,7 @@ object CountersignPayload {
                 val certificateBase64 = obj.optString("cert").ifBlank { return null }
                 Parsed.Resp(
                     sessionId, digestHex, signatureBase64, certificateBase64,
-                    hardwareBacked = obj.optBoolean("hw", false)
+                    hardwareBackedSelfReported = obj.optBoolean("hw", false)
                 )
             }
             else -> null

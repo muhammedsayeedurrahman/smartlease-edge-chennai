@@ -562,10 +562,11 @@ object ReportGenerator {
         cursor.canvas.drawText("Joint-inspection countersignatures", MARGIN.toFloat(), cursor.y, headerPaint)
         cursor.y += 18
         cursor.drawWrapped(
-            "Each entry below is a signature from a second phone's own secure hardware over " +
-                "this report's findings digest, captured via a QR code scanned between the two " +
+            "Each entry below is a signature from a second phone's own device key over this " +
+                "report's findings digest, captured via a QR code scanned between the two " +
                 "devices. It proves a specific device signed this digest; it does not identify " +
-                "a person.",
+                "a person, and whether that key was hardware-backed is that device's own claim, " +
+                "not something independently verified here.",
             bodyPaint
         )
 
@@ -590,8 +591,10 @@ object ReportGenerator {
                 }
                 cursor.drawWrapped("INVALID -- $reason.", warnPaint, gap = 6)
             } else {
+                val hwClaim = if (entry.hardwareBackedSelfReported) "claims yes" else "claims no"
                 cursor.drawWrapped(
-                    "Valid. Hardware-backed key: ${if (entry.hardwareBacked) "yes" else "not confirmed"}.",
+                    "Valid. Hardware-backed key: $hwClaim, as reported by that device -- not " +
+                        "independently verified from its certificate by this one.",
                     bodyPaint,
                     gap = 6
                 )

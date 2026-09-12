@@ -28,7 +28,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
@@ -36,11 +35,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.smartlease.edge.camera.CameraController
 import com.smartlease.edge.data.AppDatabase
 import com.smartlease.edge.data.CountersignatureEntity
-import com.smartlease.edge.camera.CameraController
 import com.smartlease.edge.report.BarcodeReader
 import com.smartlease.edge.report.CountersignPayload
+import com.smartlease.edge.report.FindingsDigest
 import com.smartlease.edge.report.InspectionReport
 import com.smartlease.edge.report.QrCode
 import com.smartlease.edge.report.ReportGenerator
@@ -62,6 +62,12 @@ import kotlinx.coroutines.launch
  * A response is only ever accepted when [report] is non-null and the scanned payload's
  * session and digest match this report's own -- a signature for a different report, or a
  * stale one from before this report's findings last changed, is rejected rather than stored.
+ *
+ * Scanning a signing *request* never signs it immediately: [ReportSigner.sign] is reachable
+ * from whatever QR a stranger's phone shows this one, so a request is held in [pendingRequest]
+ * and the digest is shown on screen for the phone's owner to read before an explicit "Sign"
+ * tap ever reaches the device key. Without that gate, anyone who can show this phone a QR
+ * code could get a signature out of it with no involvement from whoever is holding it.
  */
 @Composable
 fun CountersignScreen(report: InspectionReport?, onBack: () -> Unit) {
@@ -82,6 +88,7 @@ fun CountersignScreen(report: InspectionReport?, onBack: () -> Unit) {
     var outgoingPayload by remember(report) {
         mutableStateOf(report?.let { CountersignPayload.Request(it.sessionId, it.findingsSha256).toJson() })
     }
+    var pendingRequest by remember { mutableStateOf<CountersignPayload.Parsed.Req?>(null) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
     var isError by remember { mutableStateOf(false) }
     var recordedCount by remember { mutableStateOf(0) }
@@ -89,6 +96,24 @@ fun CountersignScreen(report: InspectionReport?, onBack: () -> Unit) {
     fun setStatus(message: String, error: Boolean) {
         statusMessage = message
         isError = error
+    }
+
+    fun confirmSign(request: CountersignPayload.Parsed.Req) {
+        val attestation = runCatching { ReportSigner.sign(request.digestHex) }.getOrNull()
+        val certificateBase64 = attestation?.certificateChainBase64?.firstOrNull()
+        pendingRequest = null
+        if (attestation == null || certificateBase64 == null) {
+            setStatus("Signing failed on this device -- no attestation key available.", true)
+        } else {
+            outgoingPayload = CountersignPayload.Response(
+                sessionId = request.sessionId,
+                digestHex = request.digestHex,
+                signatureBase64 = attestation.signatureBase64,
+                certificateBase64 = certificateBase64,
+                hardwareBackedSelfReported = attestation.hardwareBacked
+            ).toJson()
+            setStatus("Signed. Show this QR to the first phone to complete it.", false)
+        }
     }
 
     fun handleScan() {
@@ -105,21 +130,9 @@ fun CountersignScreen(report: InspectionReport?, onBack: () -> Unit) {
                     null -> setStatus("That QR isn't a SmartLease Edge countersign code.", true)
 
                     is CountersignPayload.Parsed.Req -> {
-                        val attestation = runCatching { ReportSigner.sign(parsed.digestHex) }.getOrNull()
-                        val certificateBase64 = attestation?.certificateChainBase64?.firstOrNull()
-                        if (attestation == null || certificateBase64 == null) {
-                            setStatus("Signing failed on this device -- no attestation key available.", true)
-                        } else {
-                            outgoingPayload = CountersignPayload.Response(
-                                sessionId = parsed.sessionId,
-                                digestHex = parsed.digestHex,
-                                signatureBase64 = attestation.signatureBase64,
-                                certificateBase64 = certificateBase64,
-                                hardwareBacked = attestation.hardwareBacked
-                            ).toJson()
-                            scanning = false
-                            setStatus("Signed. Show this QR to the first phone to complete it.", false)
-                        }
+                        // Held for explicit confirmation, not signed here -- see class doc.
+                        pendingRequest = parsed
+                        scanning = false
                     }
 
                     is CountersignPayload.Parsed.Resp -> {
@@ -136,7 +149,7 @@ fun CountersignScreen(report: InspectionReport?, onBack: () -> Unit) {
                                     digestHex = parsed.digestHex,
                                     signatureBase64 = parsed.signatureBase64,
                                     certificateBase64 = parsed.certificateBase64,
-                                    hardwareBacked = parsed.hardwareBacked,
+                                    hardwareBackedSelfReported = parsed.hardwareBackedSelfReported,
                                     capturedAtEpochMillis = System.currentTimeMillis()
                                 )
                             )
@@ -170,8 +183,8 @@ fun CountersignScreen(report: InspectionReport?, onBack: () -> Unit) {
             Text("Countersign", style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.onBackground)
             Spacer(Modifier.height(8.dp))
             Text(
-                "Two devices, two hardware-backed signatures over the same findings digest -- " +
-                    "each proves a specific phone signed it, not who was holding it.",
+                "Two devices, two device-key signatures over the same findings digest -- each " +
+                    "proves a specific phone signed it, not who was holding it.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -180,7 +193,41 @@ fun CountersignScreen(report: InspectionReport?, onBack: () -> Unit) {
         Spacer(Modifier.height(20.dp))
 
         Column(Modifier.padding(horizontal = 20.dp).weight(1f)) {
-            if (!scanning) {
+            val request = pendingRequest
+            if (request != null) {
+                Text(
+                    "Sign this digest?",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "The other phone is asking this device to sign the findings digest below. " +
+                        "Read it before signing -- once signed, this device has attested to it.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    FindingsDigest.grouped(request.digestHex),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(Modifier.height(16.dp))
+                Button(
+                    onClick = { confirmSign(request) },
+                    modifier = Modifier.fillMaxWidth().height(48.dp)
+                ) {
+                    Text("Sign this digest")
+                }
+                Spacer(Modifier.height(8.dp))
+                TextButton(
+                    onClick = { pendingRequest = null; setStatus("Cancelled -- nothing was signed.", false) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Cancel")
+                }
+            } else if (!scanning) {
                 val payload = outgoingPayload
                 if (payload != null) {
                     val qr = remember(payload) {
