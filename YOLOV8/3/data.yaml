@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 6
+names: ['Paint peeling', 'Spalling', 'corrosion', 'crack', 'dampness', 'efflorescence']
+
+roboflow:
+  workspace: image-classification-jf9vm
+  project: building-anomalies
+  version: 1
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/image-classification-jf9vm/building-anomalies/dataset/1

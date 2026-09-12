@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 1
+names: ['paint-peeling']
+
+roboflow:
+  workspace: image-classification-jf9vm
+  project: detection-ghu6i
+  version: 1
+  license: Public Domain
+  url: https://universe.roboflow.com/image-classification-jf9vm/detection-ghu6i/dataset/1

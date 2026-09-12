@@ -1,0 +1,9 @@
+names:
+  0: crack
+  1: peeling
+  2: spalling
+  3: stain_mould
+path: D:\hackathon\smartlease-edge-chennai\YOLOV8\unified_defects
+test: test/images
+train: train/images
+val: valid/images

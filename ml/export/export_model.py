@@ -45,6 +45,23 @@ def export_vision_model(
     print(f"Static shape: ({HARDWARE['batch_size']}, 3, {imgsz}, {imgsz})")
     print(f"Target Accelerator: {HARDWARE['target_npu']} ({HARDWARE['quantization']})")
 
+    if output_format == "ptl":
+        import torch
+        print("Exporting base TorchScript graph...")
+        ts_path = model.export(
+            format="torchscript",
+            imgsz=imgsz,
+            batch=HARDWARE["batch_size"],
+            dynamic=dynamic,
+        )
+        ts_model = torch.jit.load(ts_path, map_location="cpu")
+        ts_model.eval()
+        ptl_path = Path(ts_path).with_suffix(".ptl")
+        print(f"Saving to PyTorch Lite Interpreter format (.ptl): {ptl_path}")
+        ts_model._save_for_lite_interpreter(str(ptl_path))
+        print(f"\n✅ PTL Export successful: {ptl_path}")
+        return str(ptl_path)
+
     exported_file = model.export(
         format=output_format,
         imgsz=imgsz,
@@ -60,7 +77,7 @@ def export_vision_model(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Export trained models for Edge / NPU")
     parser.add_argument("--model", type=str, help="Path to weights file (default: models/vision_best.pt)")
-    parser.add_argument("--format", type=str, default="onnx", choices=["onnx", "torchscript", "tflite"])
+    parser.add_argument("--format", type=str, default="onnx", choices=["onnx", "torchscript", "tflite", "ptl"])
     parser.add_argument("--imgsz", type=int, default=640)
     parser.add_argument("--dynamic", action="store_true", help="Enable dynamic axes (CPU only, avoid for NPU)")
     args = parser.parse_args()

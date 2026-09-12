@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 12
+names: ['Broken window pane', 'Corrosion', 'Corrosion stain', 'Crack', 'Graffiti', 'Incomplete Plaster Work', 'Moss growth due to damping', 'Paint Peeling', 'Scaling', 'Spalling', 'exposed brickwork', 'pollution -moisture induced blackening']
+
+roboflow:
+  workspace: pothole-detection-h9muz
+  project: infrastructure-monitoring
+  version: 1
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/pothole-detection-h9muz/infrastructure-monitoring/dataset/1
