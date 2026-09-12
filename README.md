@@ -136,13 +136,23 @@ workspace root for the full ledger, and `METRICS.md` for the first recorded visi
 
 ### ⚠️ Known weaknesses we will raise before a judge does
 
-- **Vision mAP50 (mask) is 0.287** on our test split, and that figure is inflated: source
-  video frames appear on both sides of every split (`DJI_0017`: 50 train / 5 valid / 3 test).
-  `stain_mould` is effectively broken at 0.065. Full numbers in `METRICS.md`.
-- **Zero hard negatives.** Not one of the 2,106 training images is free of defects, so the
-  model has never seen a clean wall and its false-positive rate is unmeasured.
+- **Vision mAP50 (mask) is 0.249**, and the number went *down* on purpose. The previous
+  0.659 was measured on a split whose test set was 81% leaked into training — a memorisation
+  score, not an accuracy. The shipping model is retrained on a regrouped, leak-free rebuild
+  (`ml/vision/handoff/docs/DATASET.md`), so 0.249 is the first vision number here that means
+  anything. Per class: spalling 0.617, peeling 0.222, damp_stain 0.105, **crack 0.052**.
+- **Crack detection is the weak class and we will say so first.** At AP50 0.052 the model
+  finds almost no cracks. It is not the capability to demo.
+- **False positives on clean surfaces are now measured, and were the reason to retrain.** The
+  old model flagged a defect on **100%** of clean test images. The shipping model flags 28.6%
+  at the detection threshold it actually runs at (0.55), which is why that threshold is 0.55
+  and not the Ultralytics default. Sample size is only 14 clean images —
+  `docs/guides/SHOOT_LIST.md` is the 360-image shoot that would let us state this properly.
 - **The acoustic model is trained on 15 taps from 8 recordings.** 80% grouped-LOGO accuracy,
-  95% CI 62–96%, against a 53% majority baseline. Honest, and not yet a result.
+  **95% CI 55–93%**, against a **53.3%** majority baseline — so the bottom of the interval is
+  chance, and the model is not yet distinguishable from guessing at the low end. The app
+  prints this interval on screen rather than a point estimate.
+  `docs/guides/RECORDING_PROTOCOL.md` is the 32-spot recording that would close it.
 - **No on-device latency measurement exists.** 21.8 ms/image on a desktop CPU is a bound,
   not an app number.
 
