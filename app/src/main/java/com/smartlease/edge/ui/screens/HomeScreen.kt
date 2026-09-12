@@ -13,6 +13,7 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Apartment
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.House
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,7 +31,8 @@ import com.smartlease.edge.ui.Property
 fun HomeScreen(
     viewModel: AppViewModel,
     onCreateProperty: (isFlat: Boolean) -> Unit,
-    onPropertySelected: (String) -> Unit
+    onPropertySelected: (String) -> Unit,
+    onOpenSelfTest: () -> Unit
 ) {
     val properties = viewModel.properties
 
@@ -39,6 +41,13 @@ fun HomeScreen(
             TopAppBar(
                 title = { Text("SmartLease", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground) },
                 actions = {
+                    // Diagnostics has to be reachable from the first screen, with no
+                    // property and no session: the questions it answers ("did the model
+                    // load?", "is narration rule-based on this phone?") are exactly the
+                    // ones asked before anyone has recorded anything.
+                    IconButton(onClick = onOpenSelfTest) {
+                        Icon(Icons.Rounded.Info, contentDescription = "Self-test")
+                    }
                     var expanded by remember { mutableStateOf(false) }
                     Box {
                         IconButton(

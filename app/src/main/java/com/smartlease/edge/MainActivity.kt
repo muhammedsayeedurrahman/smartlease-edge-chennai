@@ -118,8 +118,16 @@ fun SmartLeaseApp(
                 },
                 onPropertySelected = { propertyId ->
                     navController.navigate("property_dashboard/$propertyId")
-                }
+                },
+                onOpenSelfTest = { navController.navigate("selftest") }
             )
+        }
+        // Restored: the UI rebuild in a9a37b46 dropped this destination while the screen
+        // itself stayed in the tree, so the diagnostics page was still compiled, still
+        // tested, and completely unreachable -- including from docs/GEMMA_SETUP.md, which
+        // tells the reader to open it to confirm which narrator this device picked.
+        composable("selftest") {
+            SelfTestScreen(onBack = { navController.popBackStack() })
         }
         composable(
             route = "create_property/{isFlat}",

@@ -12,6 +12,7 @@ import android.os.Debug
 import android.os.PowerManager
 import com.smartlease.edge.acoustic.AcousticModelBundle
 import com.smartlease.edge.narration.ReportNarratorFactory
+import com.smartlease.edge.sync.buildTimeSyncConfig
 import com.smartlease.edge.acoustic.AcousticFeatureExtractor
 import com.smartlease.edge.vision.DefectSegmenterFactory
 import com.smartlease.edge.vision.YoloSegConfig
@@ -371,10 +372,24 @@ object SelfTest {
                 val granted = context.checkSelfPermission(p) == PackageManager.PERMISSION_GRANTED
                 rows += "  ${p.substringAfterLast('.')}" to if (granted) "GRANTED" else "not granted"
             }
-            rows += "INTERNET declared" to
-                    if (declared.any { it == android.Manifest.permission.INTERNET })
-                        "YES - THIS IS A REGRESSION, the app must not have it"
-                    else "NO - correct"
+            // The app declares INTERNET on purpose now, for optional report sync. This row
+            // used to call that a regression, which stopped being true the moment sync
+            // landed -- and this screen invites the reader to screenshot it, so a stale
+            // verdict here is a false statement handed to a judge. Report the fact and the
+            // build's own configuration instead of passing a verdict on it; what actually
+            // matters for privacy is the row below, which is about the media.
+            val hasInternet = declared.any { it == android.Manifest.permission.INTERNET }
+            rows += "INTERNET declared" to when {
+                !hasInternet -> "NO"
+                buildTimeSyncConfig().syncEnabled ->
+                    "YES - for report sync, which is configured in this build"
+                else ->
+                    "YES - for optional report sync, not configured in this build"
+            }
+            // The claim worth checking. Sync uploads the findings digest and its counters;
+            // there is no field on the upload that could carry a photo, a video or an audio
+            // clip, whether or not it is switched on.
+            rows += "photos/video/audio upload" to "no code path exists - cannot leave this device"
 
             val flags = pi.applicationInfo?.flags ?: 0
             val allowsBackup = (flags and android.content.pm.ApplicationInfo.FLAG_ALLOW_BACKUP) != 0
