@@ -723,6 +723,26 @@ Concretely, in order, starting now:
 
 ---
 
+## 19. ROADMAP — VIDEO-FIRST INGESTION (designed, not built)
+
+A later proposal in the same session floated replacing the current single-shot capture flow with a video-sweep ingestion model: a 15-second guided pan per room, a gyroscope speed-gate that HUD-warns and buzzes if the pan is too fast, frame decimation via `MediaMetadataRetriever` every 500 ms, a Laplacian-variance blur gate, an ARCore-style wall-plane gate, batched Hexagon-NPU inference on the decimated frames, an IoU-based spatial deduplicator so one crack is logged once instead of once per frame, and a Llama 3.2 3B synthesis pass over the unified findings.
+
+**Decision made explicitly, today, with 15+ hours still on the clock: do not build this now.** Not because the idea is weak — it is a genuinely stronger UX thesis than the checklist framing ("a natural sweep, not fifty individual photos" is a real novelty argument) — but because as specified it re-introduces every component §16 already told you to cut, and it replaces a working, tested, just-repaired capture pipeline with five new subsystems (video capture, frame decimation, blur/plane gating, NPU batching, LLM synthesis) that do not exist in this codebase in any form today. `CameraController.kt` is single-shot `ImageCapture`; there is no `VideoCapture`, no `MediaMetadataRetriever`, no ARCore, no ExecuTorch/HTP delegate, no LLM anywhere in `app/src/main/java`. A full rewrite the same day as judging is exactly the failure mode BATTLE_PLAN §5 and this document's §16 were written to prevent.
+
+**What to do with it instead: narrative only, no code changes.** Use it as an explicitly-labelled roadmap slide or spoken line — the same honesty move already applied to the NPU delegate and GenieX elsewhere in this document (§6.3, §16 item 10): say what you built, say what you'd build next, and never blur the line between them.
+
+**Suggested deck slide / spoken line — drop-in, do not modify without re-checking against §16:**
+
+> **Today:** guided single-shot capture per room, wired and working — camera, alignment, acoustic tap, IR, and a deterministic pricing engine, entirely offline.
+>
+> **Next iteration:** a video-sweep capture mode — one guided pan per room instead of a shot list, gated in real time by the gyroscope so a too-fast pan gets corrected before the user finishes, then decimated and deduplicated offline. Designed. Not built. We'd rather ship the smaller thing that's true than the bigger thing that isn't.
+
+**If a judge asks "why didn't you build the video version?"** — the honest answer, consistent with every other admission in §13: *"We scoped it, and decided a five-subsystem rewrite — video capture, frame decimation, NPU batching, an LLM synthesis pass — the same day as judging was the wrong bet against a working single-shot pipeline we'd already tested. We'd rather demo the smaller thing that's real."* That is a Technical Depth answer, not a concession.
+
+**If you revisit this after the event**, with time to actually build and validate it, the individual pieces rank very differently on risk: the gyroscope speed-gate is cheap, self-contained UX polish that could sit on top of the *existing* single-shot flow without touching video, NPU, or LLM at all — see the "cherry-pick" option this session declined in favour of narrative-only. Frame decimation + blur/plane gating + IoU dedup is a substantial but bounded CV engineering task. NPU batching and LLM synthesis remain, as everywhere else in this document, the highest-risk, least-validated pieces, and should be attempted last, if at all.
+
+---
+
 ## IF I WERE TRYING TO BEAT 100 STRONG TEAMS, I WOULD DO THIS
 
 I would stop trying to be impressive and start being **unfalsifiable**.

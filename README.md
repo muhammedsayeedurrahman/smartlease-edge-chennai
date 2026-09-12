@@ -31,7 +31,7 @@ Researched existing solutions with verified pricing:
 |---------|---------------|----------|-------------|------------|-----------|
 | Offline operation | Yes | No (human inspector) | No (cloud) | No (SaaS) | No (SaaS) |
 | Functional testing | IR + acoustic | Visual only | Manual | Visual only | Visual only |
-| AI detection | On-device NPU | Human | None | Cloud AI | Cloud AI |
+| AI detection | On-device CPU | Human | None | Cloud AI | Cloud AI |
 | Pricing | ₹299–499 one-time | ₹1,649–5,999/inspection | Free (manual) | $0–115/mo | $0.60–1.10/unit/mo |
 | Target user | Single lease | Portfolios | DIY | Property managers | Property managers |
 
