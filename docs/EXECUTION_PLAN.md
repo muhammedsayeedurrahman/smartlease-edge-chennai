@@ -51,7 +51,7 @@ Re-check before trusting a ✅ that's more than a few hours old; code and realit
 
 | Item | Status | Next step |
 |---|---|---|
-| Pre-existing-code rule confirmed with an organizer | ⛔ **OPEN — highest severity on the entire list** | No trace in repo of this conversation happening. Ask today, phrased as disclosure: *"our repo has ~11 days of pre-event research/training/architecture; the application work is being done here — how do you want that declared?"* |
+| Pre-existing-code rule confirmed with an organizer | ✅ **RESOLVED 2026-09-12 — verbal confirmation, on-site** | Organiser asked directly, confirmed pre-existing code is allowed and judging looks at what's built on top of it during the event. Labelled [FIRST-PARTY, UNVERIFIED BY ME] per this doc's own discipline — a spoken confirmation, not a written rule — but treated as authoritative, same as every other organiser statement already relied on in `HACKTRACKER_STRATEGY.md`. Removes the one risk that could void everything else. Still keep committing with clear messages — the standard confirmed is literally "what you built on top," and `git log` is the evidence. |
 | False claims stripped from deck (`.pptx`) | ✅ DONE | `docs/pitch/PITCH_DECK_PROMPT.md` carries a "SUPERSEDED IN PART — 2026-09-12" notice; both the `.md` and `.pptx` share an 11:37 timestamp today, evidence of an actual regeneration pass, not just a note. Hexagon NPU, GenieX/Llama, dual signatures, ARCore depth, inflated sample sizes — all corrected per that note. |
 | False claims stripped from README | ✅ DONE | Verified clean via grep for Hexagon/NPU/GenieX/Llama/ARCore/`<30ms`/banned rupee-crore stats — all either absent or already correctly labelled "not currently used." One residual contradiction fixed this session (§1 above). |
 | `AUDIT_CLAIMS.md` referenced by `PITCH_DECK_PROMPT.md` but not present in repo | ⚠️ noted, not urgent | Dangling reference — may have lived outside the repo. Doesn't block anything; just means you can't point back to it if asked what exactly was audited. |
@@ -70,15 +70,15 @@ Re-check before trusting a ✅ that's more than a few hours old; code and realit
 
 ## What actually needs a person right now, today
 
-Everything in this plan that's marked ✅ or 🔧 is closed or nearly closed by code that already exists. What's left that *matters* is not more code — it's:
+Everything in this plan that's marked ✅ or 🔧 is closed or nearly closed by code that already exists. The pre-existing-code risk is resolved. What's left that *matters* is not more code — it's:
 
-1. **Ask an organizer about the pre-existing-code rule.** Five minutes. Highest-severity open item on the board.
-2. **Capture the venue AC's real IR pattern**, in the room, on the actual unit.
-3. **Rehearse the full flow three times, timed, airplane mode, and record the backup video the moment one succeeds.**
-4. **Run the extended `SelfTestScreen` at least once on the actual iQOO handset** — it now reports battery and thermal status alongside inference latency, so this closes the "not measured on-device" gap in the Device Benchmark Plan cheaply. Screenshot it.
-5. **Turn Office Kit mirroring on and leave it on.** Free telemetry, zero risk, zero code.
+1. **Capture the venue AC's real IR pattern**, in the room, on the actual unit. Now the single highest-priority open item.
+2. **Rehearse the full flow three times, timed, airplane mode, and record the backup video the moment one succeeds.**
+3. **Run the extended `SelfTestScreen` at least once on the actual iQOO handset** — it now reports battery and thermal status alongside inference latency, so this closes the "not measured on-device" gap in the Device Benchmark Plan cheaply. Screenshot it.
+4. **Turn Office Kit mirroring on and leave it on.** Free telemetry, zero risk, zero code.
+5. **Keep committing with clear messages.** The organiser's confirmation makes "what was built on top" the explicit standard — your `git log` is now literally the evidence being judged, not just a courtesy.
 
-Nothing else on this list should get touched before those five.
+Nothing else on this list should get touched before those.
 
 ---
 

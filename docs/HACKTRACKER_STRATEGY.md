@@ -358,15 +358,15 @@ This is strong *because* it is honest about being unbuilt. It shows you know wha
 
 ## 11. RED / GREEN LIGHT EXECUTION PLAN
 
-### 11.1 The rule you must clear first — before anything else in this section
+### 11.1 The rule that was the highest risk in the project — now resolved, verbally
 
-**[HIGHEST RISK IN THE PROJECT. Unchanged from BATTLE_PLAN §3.]** Qualcomm's rules for its own edge-AI events forbid closed-source pre-existing code and require a pre-existing proposal to be "significantly modified" during the event (confirmed 3-0 in the research log). **iQOO/Reskilll's specific wording was never verified.** This repository carries roughly eleven days of pre-event work.
+**[RESOLVED 2026-09-12 — was the HIGHEST RISK IN THE PROJECT.]** Qualcomm's rules for its own edge-AI events forbid closed-source pre-existing code and require a pre-existing proposal to be "significantly modified" during the event (confirmed 3-0 in the research log) — a different event, cited only as a directional signal, never as this event's rule.
 
-**Action, today, before you write another line: ask an organiser directly.** Phrase it as disclosure, not permission-seeking: *"Our repo has pre-event research, datasets and model training. The application work is being done here. Can you confirm how you want pre-event work declared?"* Teams that disclose early are treated as honest. Teams that are discovered at judging are not.
+**An organiser was asked directly, on-site, and confirmed verbally: pre-existing code is allowed, and judging looks at what is built on top of it during the event.** Label discipline applied consistently with the rest of this document: this is **[FIRST-PARTY, UNVERIFIED BY ME]** — an organiser's spoken word, not a document I read myself — but it is treated as authoritative, the same standard already applied to the organiser briefing quoted throughout this analysis and to the scoring weights in §1.
 
-Then make your Round-1 checkpoint **demonstrate in-event work**: the deduction engine wiring, the PDF balance sheet, the manifest permission removal, the venue IR capture, the validation metrics. Those are all real, all today's, and all show in `git log`. **Your commit history is your alibi. Keep committing with clear messages.**
+**What this changes:** nothing about the recommended behaviour. **What it removes:** the catastrophic tail risk of disqualification for carrying eleven days of pre-event work. **What it confirms instead of merely hoping:** "original work built on top of" was always the standard stated in the organiser briefing (§1, F8) — this exchange confirms that standard applies here specifically, not just in general terms.
 
-**This document does not advise any way around this rule and there isn't one worth taking.**
+**Still make the Round-1 checkpoint demonstrate in-event work** — the deduction engine wiring, the PDF balance sheet, the manifest permission removal, the on-device performance readings, the venue IR capture, the validation metrics. Not because a disqualification hinges on it anymore, but because "what was built on top" is explicitly the thing now confirmed to be judged, and `git log` is the evidence for that. **Keep committing with clear messages.**
 
 ### 11.2 Red Light (≈55% of build time) — phone-first
 
