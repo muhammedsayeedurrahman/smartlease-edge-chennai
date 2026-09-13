@@ -94,6 +94,10 @@ fun JudgeDemoScreen(onBack: () -> Unit) {
     var result by remember { mutableStateOf<DemoPipelineRunner.Result?>(null) }
 
     fun runPipeline() {
+        // DemoPipelineRunner.run() now hops to Dispatchers.Default immediately, so this state
+        // write reaches the Button's `enabled` before any heavy work starts -- but a guard here
+        // costs nothing and means a stray extra tap can never queue a second overlapping run.
+        if (isRunning) return
         isRunning = true
         runError = null
         scope.launch {
