@@ -18,6 +18,8 @@ import com.smartlease.edge.ui.CapturedFrame
 import com.smartlease.edge.ui.Room
 import com.smartlease.edge.vision.DefectSegmenter
 import com.smartlease.edge.vision.DefectSegmenterFactory
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.UUID
 
@@ -85,7 +87,23 @@ object DemoPipelineRunner {
         val usingTrainedModel get() = rooms.firstOrNull()?.isTrainedModel ?: false
     }
 
-    suspend fun run(context: Context): Result {
+    /**
+     * Runs entirely on [Dispatchers.Default]: bitmap decode, three rounds of segmentation and
+     * PDF rendering are all CPU/IO work with no UI-thread requirement, and running them on the
+     * caller's dispatcher (Main, from [JudgeDemoScreen]'s `rememberCoroutineScope()`) used to
+     * freeze the whole screen for the run's duration -- no spinner, a Button that visually
+     * looked unresponsive, and, since the UI couldn't recompose to disable it, a second tap
+     * fired a second overlapping run instead of being ignored.
+     */
+    /**
+     * @param onProgress a one-line status a judge can read while this runs -- device thermal
+     * throttling can stretch a run to a minute or more (each on-device inference pass slows down
+     * as the SoC downclocks to cool off), and a screen with no feedback for that long reads as
+     * hung even though it is still working. Called from [Dispatchers.Default]; Compose's
+     * snapshot state is safe to write from a background thread.
+     */
+    suspend fun run(context: Context, onProgress: (String) -> Unit = {}): Result = withContext(Dispatchers.Default) {
+        onProgress("Loading the on-device vision model…")
         val segmenter = DefectSegmenterFactory.create(context)
         val sessionId = UUID.randomUUID().toString()
 
@@ -94,6 +112,7 @@ object DemoPipelineRunner {
         val rooms = mutableListOf<Room>()
 
         DEMO_ROOMS.forEachIndexed { index, spec ->
+            onProgress("Analyzing ${spec.roomType} (${index + 1}/${DEMO_ROOMS.size})…")
             val moveInBitmap = decodeDemoBitmap(context, spec.moveInRes)
             val moveOutBitmap = decodeDemoBitmap(context, spec.moveOutRes)
             val defects = segmenter.segmentDefects(
@@ -157,6 +176,7 @@ object DemoPipelineRunner {
             )
         }
 
+        onProgress("Selecting narrator and pricing deductions…")
         // Selected once, used once, closed once -- exactly the lifecycle
         // MainActivity.onGenerateReport gives it for a real session (see that file's own
         // comment on why: a loaded Gemma model pins hundreds of megabytes for the duration).
@@ -174,9 +194,10 @@ object DemoPipelineRunner {
             selection.narrator.close()
         }
 
+        onProgress("Rendering the report PDF…")
         val pdfFile = ReportGenerator.renderToPdf(context, report, rooms = rooms)
 
-        return Result(
+        Result(
             rooms = roomResults,
             findings = allFindings,
             deduction = report.deductions,
