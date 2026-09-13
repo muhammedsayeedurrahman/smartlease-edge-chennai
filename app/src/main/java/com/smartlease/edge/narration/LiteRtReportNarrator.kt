@@ -191,16 +191,31 @@ class LiteRtReportNarrator private constructor(
             file: File,
             maxTokens: Int
         ): LiteRtReportNarrator? = runCatching {
-            val options = com.google.mediapipe.tasks.genai.llminference.LlmInference.LlmInferenceOptions.builder()
-                .setModelPath(file.absolutePath)
-                .setMaxTokens(maxTokens)
-                .setMaxTopK(1)
-                .build()
-            val engine = com.google.mediapipe.tasks.genai.llminference.LlmInference.createFromOptions(context, options)
+            val engineClass = runCatching {
+                Class.forName("com.google.mediapipe.tasks.genai.llminference.LlmInference")
+            }.getOrNull() ?: return null
+
+            val optionsClass = Class.forName("com.google.mediapipe.tasks.genai.llminference.LlmInference\$LlmInferenceOptions")
+            val builderMethod = optionsClass.getMethod("builder")
+            val builder = builderMethod.invoke(null)
+            builder.javaClass.getMethod("setModelPath", String::class.java).invoke(builder, file.absolutePath)
+            runCatching {
+                builder.javaClass.getMethod("setMaxTokens", Int::class.javaPrimitiveType).invoke(builder, maxTokens)
+            }
+            runCatching {
+                builder.javaClass.getMethod("setMaxTopK", Int::class.javaPrimitiveType).invoke(builder, 1)
+            }
+            val options = builder.javaClass.getMethod("build").invoke(builder)
+
+            val createMethod = engineClass.getMethod("createFromOptions", Context::class.java, options.javaClass)
+            val engine = createMethod.invoke(null, context, options)
+
+            val generateMethod = engineClass.getMethod("generateResponse", String::class.java)
+            val closeMethod = engineClass.getMethod("close")
 
             LiteRtReportNarrator(
-                generateFn = { prompt -> engine.generateResponse(prompt) },
-                closeFn = { engine.close() },
+                generateFn = { prompt -> generateMethod.invoke(engine, prompt) as String },
+                closeFn = { closeMethod.invoke(engine) },
                 modelName = file.name,
                 maxTokens = maxTokens
             )
