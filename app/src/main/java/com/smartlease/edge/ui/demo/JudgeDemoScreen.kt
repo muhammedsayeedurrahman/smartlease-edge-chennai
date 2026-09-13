@@ -90,6 +90,7 @@ fun JudgeDemoScreen(onBack: () -> Unit) {
 
     var stage by rememberSaveable { mutableStateOf(DemoStage.EVIDENCE) }
     var isRunning by remember { mutableStateOf(false) }
+    var progressText by remember { mutableStateOf("") }
     var runError by remember { mutableStateOf<String?>(null) }
     var result by remember { mutableStateOf<DemoPipelineRunner.Result?>(null) }
 
@@ -100,9 +101,10 @@ fun JudgeDemoScreen(onBack: () -> Unit) {
         if (isRunning) return
         isRunning = true
         runError = null
+        progressText = "Starting…"
         scope.launch {
             try {
-                result = DemoPipelineRunner.run(context)
+                result = DemoPipelineRunner.run(context) { progressText = it }
                 stage = DemoStage.VISION
             } catch (e: Exception) {
                 runError = e.message ?: e.javaClass.simpleName
@@ -145,6 +147,7 @@ fun JudgeDemoScreen(onBack: () -> Unit) {
             when (stage) {
                 DemoStage.EVIDENCE -> EvidenceStage(
                     isRunning = isRunning,
+                    progressText = progressText,
                     runError = runError,
                     onRun = ::runPipeline
                 )
@@ -274,7 +277,7 @@ private val DEMO_EVIDENCE = listOf(
 )
 
 @Composable
-private fun EvidenceStage(isRunning: Boolean, runError: String?, onRun: () -> Unit) {
+private fun EvidenceStage(isRunning: Boolean, progressText: String, runError: String?, onRun: () -> Unit) {
     Text(
         "Evidence timeline",
         style = MaterialTheme.typography.titleLarge,
@@ -351,6 +354,29 @@ private fun EvidenceStage(isRunning: Boolean, runError: String?, onRun: () -> Un
         }
     }
 
+    if (isRunning) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            shape = RoundedCornerShape(18.dp)
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text(progressText, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                    Text(
+                        "On-device inference can take a while if the phone is thermally throttled -- this is working, not stuck.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+
     Button(
         onClick = onRun,
         enabled = !isRunning,
@@ -359,7 +385,7 @@ private fun EvidenceStage(isRunning: Boolean, runError: String?, onRun: () -> Un
         if (isRunning) {
             CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
             Spacer(Modifier.width(8.dp))
-            Text("Running vision, deduction and narration…")
+            Text("Working…")
         } else {
             Icon(Icons.Rounded.Description, contentDescription = null)
             Spacer(Modifier.width(8.dp))

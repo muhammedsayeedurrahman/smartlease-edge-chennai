@@ -95,7 +95,15 @@ object DemoPipelineRunner {
      * looked unresponsive, and, since the UI couldn't recompose to disable it, a second tap
      * fired a second overlapping run instead of being ignored.
      */
-    suspend fun run(context: Context): Result = withContext(Dispatchers.Default) {
+    /**
+     * @param onProgress a one-line status a judge can read while this runs -- device thermal
+     * throttling can stretch a run to a minute or more (each on-device inference pass slows down
+     * as the SoC downclocks to cool off), and a screen with no feedback for that long reads as
+     * hung even though it is still working. Called from [Dispatchers.Default]; Compose's
+     * snapshot state is safe to write from a background thread.
+     */
+    suspend fun run(context: Context, onProgress: (String) -> Unit = {}): Result = withContext(Dispatchers.Default) {
+        onProgress("Loading the on-device vision model…")
         val segmenter = DefectSegmenterFactory.create(context)
         val sessionId = UUID.randomUUID().toString()
 
@@ -104,6 +112,7 @@ object DemoPipelineRunner {
         val rooms = mutableListOf<Room>()
 
         DEMO_ROOMS.forEachIndexed { index, spec ->
+            onProgress("Analyzing ${spec.roomType} (${index + 1}/${DEMO_ROOMS.size})…")
             val moveInBitmap = decodeDemoBitmap(context, spec.moveInRes)
             val moveOutBitmap = decodeDemoBitmap(context, spec.moveOutRes)
             val defects = segmenter.segmentDefects(
@@ -167,6 +176,7 @@ object DemoPipelineRunner {
             )
         }
 
+        onProgress("Selecting narrator and pricing deductions…")
         // Selected once, used once, closed once -- exactly the lifecycle
         // MainActivity.onGenerateReport gives it for a real session (see that file's own
         // comment on why: a loaded Gemma model pins hundreds of megabytes for the duration).
@@ -184,6 +194,7 @@ object DemoPipelineRunner {
             selection.narrator.close()
         }
 
+        onProgress("Rendering the report PDF…")
         val pdfFile = ReportGenerator.renderToPdf(context, report, rooms = rooms)
 
         Result(
