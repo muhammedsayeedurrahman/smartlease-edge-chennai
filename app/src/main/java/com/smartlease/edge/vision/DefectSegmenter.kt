@@ -41,6 +41,16 @@ interface DefectSegmenter {
 }
 
 /**
+ * Tenant-facing description of a single detection, e.g. "crack in wall surface (2.30 sq ft,
+ * 87% confidence)". Shared by [com.smartlease.edge.report.ReportGenerator]'s printed
+ * move-in/move-out comparison and [com.smartlease.edge.ui.screens.ReportScreen]'s on-screen
+ * one, so a fault reads identically in both places rather than drifting into two wordings for
+ * the same detection.
+ */
+fun DefectSegmenter.Defect.describeFault(): String =
+    "$label (%.2f sq ft, %d%% confidence)".format(areaSqFtEstimate, (confidence * 100).toInt())
+
+/**
  * Placeholder implementation used until the real trained/exported model exists.
  * Flags large contiguous dark/discolored regions via basic pixel sampling — genuinely
  * runs, genuinely on-device, genuinely NOT the vision-segmenter novelty claim the pitch

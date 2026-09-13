@@ -65,6 +65,7 @@ import com.smartlease.edge.ui.components.Panel
 import com.smartlease.edge.ui.components.StatusLamp
 import com.smartlease.edge.ui.theme.ReadoutValue
 import com.smartlease.edge.ui.theme.ReadoutValueLarge
+import com.smartlease.edge.vision.describeFault
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -458,6 +459,16 @@ private fun ImageComparisonPanel(rooms: List<Room>) {
                         ComparisonThumbnail(beforeFrame, "Move-in", Modifier.weight(1f))
                         ComparisonThumbnail(afterFrame, "Move-out", Modifier.weight(1f))
                     }
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = if (afterFrame.defects.isEmpty()) {
+                            "No faults detected on this surface at move-out."
+                        } else {
+                            "Fault(s): " + afterFrame.defects.joinToString("; ") { it.describeFault() }
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
                 }
             }
         }

@@ -20,6 +20,7 @@ import com.smartlease.edge.narration.TemplateReportNarrator
 import com.smartlease.edge.sync.buildTimeSyncConfig
 import com.smartlease.edge.ui.CapturedFrame
 import com.smartlease.edge.ui.Room
+import com.smartlease.edge.vision.describeFault
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
@@ -394,10 +395,12 @@ object ReportGenerator {
      * panel of the same data. Draws nothing when [rooms] yields no such pair, exactly like
      * that panel: a move-in-only report gets no page here, not an empty one.
      *
-     * Visual-only, same as the screen version: this places bitmaps next to each other and
-     * nothing else. It does not diff, score, or price the two images -- that would be a claim
-     * about what changed between them, which belongs to the findings the segmenter actually
-     * produced and the deduction engine that prices them, not to a side-by-side layout.
+     * Visual-only in one sense: this does not diff or score the two bitmaps itself -- that
+     * would be a claim about what changed between them, pixel to pixel, which this layout has
+     * no basis to make. What it does print underneath each pair is the move-out frame's own
+     * already-computed defects (the same [com.smartlease.edge.vision.DefectSegmenter.Defect]
+     * list the findings section and deduction engine were built from) -- naming the fault next
+     * to the photo it came from, not inventing a new one.
      */
     private fun drawImageComparison(cursor: PdfCursor, report: InspectionReport, rooms: List<Room>) {
         val comparisons = rooms.mapNotNull { room ->
@@ -418,14 +421,15 @@ object ReportGenerator {
         val labelPaint = TextPaint().apply { textSize = 9f; color = 0xFF666666.toInt() }
         val captionPaint = TextPaint().apply { textSize = 8f; color = 0xFF333333.toInt() }
         val notePaint = TextPaint().apply { textSize = 8.5f; color = 0xFF333333.toInt() }
+        val faultPaint = TextPaint().apply { textSize = 8.5f; color = 0xFFAA2200.toInt() }
 
         cursor.breakPageIfBelow(report, 200)
         cursor.canvas.drawText("Move-in vs move-out", MARGIN.toFloat(), cursor.y, headerPaint)
         cursor.y += 16
         cursor.drawWrapped(
-            "The same surface captured at both sessions, placed side by side for direct " +
-                "comparison. Not scored or priced -- the findings and deduction sheet " +
-                "elsewhere in this report are.",
+            "The same surface captured at both sessions, placed side by side, with the " +
+                "move-out defects the segmenter found on that surface printed underneath. " +
+                "Priced in full in the findings and deduction sheet elsewhere in this report.",
             notePaint
         )
 
@@ -438,7 +442,12 @@ object ReportGenerator {
             cursor.y += 14
 
             pairs.forEach { (surface, beforeFrame, afterFrame) ->
-                cursor.breakPageIfBelow(report, thumbHeight + 40)
+                val faultText = if (afterFrame.defects.isEmpty()) {
+                    "No faults detected on this surface at move-out."
+                } else {
+                    "Fault(s): " + afterFrame.defects.joinToString("; ") { it.describeFault() }
+                }
+                cursor.breakPageIfBelow(report, thumbHeight + 70)
                 cursor.canvas.drawText(surface, MARGIN.toFloat(), cursor.y, labelPaint)
                 cursor.y += 12
 
@@ -452,7 +461,8 @@ object ReportGenerator {
                 cursor.y += thumbHeight + 12
                 cursor.canvas.drawText("Move-in", leftRect.left.toFloat(), cursor.y, captionPaint)
                 cursor.canvas.drawText("Move-out", rightRect.left.toFloat(), cursor.y, captionPaint)
-                cursor.y += 16
+                cursor.y += 14
+                cursor.drawWrapped(faultText, faultPaint, gap = 10)
             }
         }
         cursor.y += 8

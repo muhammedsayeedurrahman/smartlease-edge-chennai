@@ -28,6 +28,7 @@ import com.smartlease.edge.report.PropertyReportBuilder
 import com.smartlease.edge.report.ReportGenerator
 import com.smartlease.edge.ui.AppViewModel
 import com.smartlease.edge.ui.Room
+import com.smartlease.edge.ui.demo.JudgeDemoScreen
 import com.smartlease.edge.ui.screens.*
 import com.smartlease.edge.ui.theme.SmartLeaseEdgeTheme
 import kotlinx.coroutines.Dispatchers
@@ -124,8 +125,12 @@ fun SmartLeaseApp(
                 onPropertySelected = { propertyId ->
                     navController.navigate("property_dashboard/$propertyId")
                 },
-                onOpenSelfTest = { navController.navigate("selftest") }
+                onOpenSelfTest = { navController.navigate("selftest") },
+                onOpenJudgeDemo = { navController.navigate("judge_demo") }
             )
+        }
+        composable("judge_demo") {
+            JudgeDemoScreen(onBack = { navController.popBackStack() })
         }
         // Restored: the UI rebuild in a9a37b46 dropped this destination while the screen
         // itself stayed in the tree, so the diagnostics page was still compiled, still
