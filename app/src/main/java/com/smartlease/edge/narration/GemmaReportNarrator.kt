@@ -44,7 +44,8 @@ import java.io.File
  */
 class GemmaReportNarrator private constructor(
     private val engine: Engine,
-    private val modelName: String
+    private val modelName: String,
+    private val maxTokens: Int = MAX_TOKENS
 ) : ReportNarrator {
 
     override suspend fun narrate(
@@ -94,7 +95,7 @@ class GemmaReportNarrator private constructor(
                 temperature = 0.0,
                 seed = 0
             ),
-            maxOutputToken = MAX_TOKENS
+            maxOutputToken = maxTokens
         )
 
     /**
@@ -157,7 +158,11 @@ class GemmaReportNarrator private constructor(
          * template. Both are tried before giving up. NPU is not attempted here -- it needs a
          * per-SoC library bundle the app does not ship.
          */
-        fun tryCreate(context: Context, file: File): GemmaReportNarrator? {
+        fun tryCreate(
+            context: Context,
+            file: File,
+            maxTokens: Int = MAX_TOKENS
+        ): GemmaReportNarrator? {
             // Named pairs rather than `backend::class.simpleName`: reading the class name
             // reflectively pulls in kotlin-reflect at runtime, and the version LiteRT-LM drags
             // in is incompatible with the project's Kotlin, so touching Reflection here crashed
@@ -179,7 +184,7 @@ class GemmaReportNarrator private constructor(
 
                 if (engine != null) {
                     Log.i(TAG, "Loaded ${file.name} on $name")
-                    return GemmaReportNarrator(engine, file.name)
+                    return GemmaReportNarrator(engine, file.name, maxTokens)
                 }
             }
             Log.w(TAG, "Could not load Gemma model at ${file.absolutePath} on any backend")
