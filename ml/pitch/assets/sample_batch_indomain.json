@@ -1,0 +1,351 @@
+{
+ "rows": [
+  {
+   "set": "Hemg",
+   "path": "data/samples/Hemg_deepfake_and_real_images\\fake\\fake_0000.jpg",
+   "label": "fake",
+   "risk": 0.811,
+   "verdict": "AI-GENERATED",
+   "ms": 65095
+  },
+  {
+   "set": "Hemg",
+   "path": "data/samples/Hemg_deepfake_and_real_images\\fake\\fake_0001.jpg",
+   "label": "fake",
+   "risk": 0.574,
+   "verdict": "AUTHENTIC",
+   "ms": 5896
+  },
+  {
+   "set": "Hemg",
+   "path": "data/samples/Hemg_deepfake_and_real_images\\fake\\fake_0002.jpg",
+   "label": "fake",
+   "risk": 0.102,
+   "verdict": "AUTHENTIC",
+   "ms": 5521
+  },
+  {
+   "set": "Hemg",
+   "path": "data/samples/Hemg_deepfake_and_real_images\\fake\\fake_0003.jpg",
+   "label": "fake",
+   "risk": 0.089,
+   "verdict": "AUTHENTIC",
+   "ms": 5373
+  },
+  {
+   "set": "Hemg",
+   "path": "data/samples/Hemg_deepfake_and_real_images\\fake\\fake_0004.jpg",
+   "label": "fake",
+   "risk": 0.92,
+   "verdict": "AI-GENERATED",
+   "ms": 5383
+  },
+  {
+   "set": "Hemg",
+   "path": "data/samples/Hemg_deepfake_and_real_images\\fake\\fake_0005.jpg",
+   "label": "fake",
+   "risk": 0.947,
+   "verdict": "AI-GENERATED",
+   "ms": 5298
+  },
+  {
+   "set": "Hemg",
+   "path": "data/samples/Hemg_deepfake_and_real_images\\fake\\fake_0006.jpg",
+   "label": "fake",
+   "risk": 0.344,
+   "verdict": "AUTHENTIC",
+   "ms": 6415
+  },
+  {
+   "set": "Hemg",
+   "path": "data/samples/Hemg_deepfake_and_real_images\\fake\\fake_0007.jpg",
+   "label": "fake",
+   "risk": 0.239,
+   "verdict": "AUTHENTIC",
+   "ms": 5511
+  },
+  {
+   "set": "Hemg",
+   "path": "data/samples/Hemg_deepfake_and_real_images\\fake\\fake_0008.jpg",
+   "label": "fake",
+   "risk": 0.934,
+   "verdict": "AI-GENERATED",
+   "ms": 6405
+  },
+  {
+   "set": "Hemg",
+   "path": "data/samples/Hemg_deepfake_and_real_images\\fake\\fake_0009.jpg",
+   "label": "fake",
+   "risk": 0.09,
+   "verdict": "AUTHENTIC",
+   "ms": 6902
+  },
+  {
+   "set": "Hemg",
+   "path": "data/samples/Hemg_deepfake_and_real_images\\real\\real_0000.jpg",
+   "label": "real",
+   "risk": 0.137,
+   "verdict": "AUTHENTIC",
+   "ms": 5845
+  },
+  {
+   "set": "Hemg",
+   "path": "data/samples/Hemg_deepfake_and_real_images\\real\\real_0001.jpg",
+   "label": "real",
+   "risk": 0.098,
+   "verdict": "AUTHENTIC",
+   "ms": 5802
+  },
+  {
+   "set": "Hemg",
+   "path": "data/samples/Hemg_deepfake_and_real_images\\real\\real_0002.jpg",
+   "label": "real",
+   "risk": 0.126,
+   "verdict": "AUTHENTIC",
+   "ms": 5698
+  },
+  {
+   "set": "Hemg",
+   "path": "data/samples/Hemg_deepfake_and_real_images\\real\\real_0003.jpg",
+   "label": "real",
+   "risk": 0.25,
+   "verdict": "AUTHENTIC",
+   "ms": 5243
+  },
+  {
+   "set": "Hemg",
+   "path": "data/samples/Hemg_deepfake_and_real_images\\real\\real_0004.jpg",
+   "label": "real",
+   "risk": 0.34,
+   "verdict": "AUTHENTIC",
+   "ms": 5325
+  },
+  {
+   "set": "Hemg",
+   "path": "data/samples/Hemg_deepfake_and_real_images\\real\\real_0005.jpg",
+   "label": "real",
+   "risk": 0.157,
+   "verdict": "AUTHENTIC",
+   "ms": 5165
+  },
+  {
+   "set": "Hemg",
+   "path": "data/samples/Hemg_deepfake_and_real_images\\real\\real_0006.jpg",
+   "label": "real",
+   "risk": 0.553,
+   "verdict": "AUTHENTIC",
+   "ms": 5019
+  },
+  {
+   "set": "Hemg",
+   "path": "data/samples/Hemg_deepfake_and_real_images\\real\\real_0007.jpg",
+   "label": "real",
+   "risk": 0.674,
+   "verdict": "AI-GENERATED",
+   "ms": 5631
+  },
+  {
+   "set": "Hemg",
+   "path": "data/samples/Hemg_deepfake_and_real_images\\real\\real_0008.jpg",
+   "label": "real",
+   "risk": 0.673,
+   "verdict": "AI-GENERATED",
+   "ms": 5931
+  },
+  {
+   "set": "Hemg",
+   "path": "data/samples/Hemg_deepfake_and_real_images\\real\\real_0009.jpg",
+   "label": "real",
+   "risk": 0.086,
+   "verdict": "AUTHENTIC",
+   "ms": 5126
+  },
+  {
+   "set": "JamieWithofs",
+   "path": "data/samples/JamieWithofs_Deepfake_and_real_images\\fake\\fake_0000.jpg",
+   "label": "fake",
+   "risk": 0.055,
+   "verdict": "AUTHENTIC",
+   "ms": 5292
+  },
+  {
+   "set": "JamieWithofs",
+   "path": "data/samples/JamieWithofs_Deepfake_and_real_images\\fake\\fake_0001.jpg",
+   "label": "fake",
+   "risk": 0.887,
+   "verdict": "AI-GENERATED",
+   "ms": 5763
+  },
+  {
+   "set": "JamieWithofs",
+   "path": "data/samples/JamieWithofs_Deepfake_and_real_images\\fake\\fake_0002.jpg",
+   "label": "fake",
+   "risk": 0.142,
+   "verdict": "AUTHENTIC",
+   "ms": 5201
+  },
+  {
+   "set": "JamieWithofs",
+   "path": "data/samples/JamieWithofs_Deepfake_and_real_images\\fake\\fake_0003.jpg",
+   "label": "fake",
+   "risk": 0.094,
+   "verdict": "AUTHENTIC",
+   "ms": 5310
+  },
+  {
+   "set": "JamieWithofs",
+   "path": "data/samples/JamieWithofs_Deepfake_and_real_images\\fake\\fake_0004.jpg",
+   "label": "fake",
+   "risk": 0.929,
+   "verdict": "AI-GENERATED",
+   "ms": 5215
+  },
+  {
+   "set": "JamieWithofs",
+   "path": "data/samples/JamieWithofs_Deepfake_and_real_images\\fake\\fake_0005.jpg",
+   "label": "fake",
+   "risk": 0.888,
+   "verdict": "AI-GENERATED",
+   "ms": 5532
+  },
+  {
+   "set": "JamieWithofs",
+   "path": "data/samples/JamieWithofs_Deepfake_and_real_images\\fake\\fake_0006.jpg",
+   "label": "fake",
+   "risk": 0.272,
+   "verdict": "AUTHENTIC",
+   "ms": 5450
+  },
+  {
+   "set": "JamieWithofs",
+   "path": "data/samples/JamieWithofs_Deepfake_and_real_images\\fake\\fake_0007.jpg",
+   "label": "fake",
+   "risk": 0.303,
+   "verdict": "AUTHENTIC",
+   "ms": 5458
+  },
+  {
+   "set": "JamieWithofs",
+   "path": "data/samples/JamieWithofs_Deepfake_and_real_images\\fake\\fake_0008.jpg",
+   "label": "fake",
+   "risk": 0.05,
+   "verdict": "AUTHENTIC",
+   "ms": 6148
+  },
+  {
+   "set": "JamieWithofs",
+   "path": "data/samples/JamieWithofs_Deepfake_and_real_images\\fake\\fake_0009.jpg",
+   "label": "fake",
+   "risk": 0.1,
+   "verdict": "AUTHENTIC",
+   "ms": 5338
+  },
+  {
+   "set": "JamieWithofs",
+   "path": "data/samples/JamieWithofs_Deepfake_and_real_images\\real\\real_0000.jpg",
+   "label": "real",
+   "risk": 0.115,
+   "verdict": "AUTHENTIC",
+   "ms": 5352
+  },
+  {
+   "set": "JamieWithofs",
+   "path": "data/samples/JamieWithofs_Deepfake_and_real_images\\real\\real_0001.jpg",
+   "label": "real",
+   "risk": 0.103,
+   "verdict": "AUTHENTIC",
+   "ms": 5212
+  },
+  {
+   "set": "JamieWithofs",
+   "path": "data/samples/JamieWithofs_Deepfake_and_real_images\\real\\real_0002.jpg",
+   "label": "real",
+   "risk": 0.1,
+   "verdict": "AUTHENTIC",
+   "ms": 5262
+  },
+  {
+   "set": "JamieWithofs",
+   "path": "data/samples/JamieWithofs_Deepfake_and_real_images\\real\\real_0003.jpg",
+   "label": "real",
+   "risk": 0.208,
+   "verdict": "AUTHENTIC",
+   "ms": 5301
+  },
+  {
+   "set": "JamieWithofs",
+   "path": "data/samples/JamieWithofs_Deepfake_and_real_images\\real\\real_0004.jpg",
+   "label": "real",
+   "risk": 0.201,
+   "verdict": "AUTHENTIC",
+   "ms": 5149
+  },
+  {
+   "set": "JamieWithofs",
+   "path": "data/samples/JamieWithofs_Deepfake_and_real_images\\real\\real_0005.jpg",
+   "label": "real",
+   "risk": 0.151,
+   "verdict": "AUTHENTIC",
+   "ms": 6427
+  },
+  {
+   "set": "JamieWithofs",
+   "path": "data/samples/JamieWithofs_Deepfake_and_real_images\\real\\real_0006.jpg",
+   "label": "real",
+   "risk": 0.439,
+   "verdict": "AUTHENTIC",
+   "ms": 7110
+  },
+  {
+   "set": "JamieWithofs",
+   "path": "data/samples/JamieWithofs_Deepfake_and_real_images\\real\\real_0007.jpg",
+   "label": "real",
+   "risk": 0.114,
+   "verdict": "AUTHENTIC",
+   "ms": 5845
+  },
+  {
+   "set": "JamieWithofs",
+   "path": "data/samples/JamieWithofs_Deepfake_and_real_images\\real\\real_0008.jpg",
+   "label": "real",
+   "risk": 0.157,
+   "verdict": "AUTHENTIC",
+   "ms": 5337
+  },
+  {
+   "set": "JamieWithofs",
+   "path": "data/samples/JamieWithofs_Deepfake_and_real_images\\real\\real_0009.jpg",
+   "label": "real",
+   "risk": 0.085,
+   "verdict": "AUTHENTIC",
+   "ms": 6742
+  }
+ ],
+ "summary": {
+  "all": {
+   "tp": 7,
+   "fn": 13,
+   "fp": 2,
+   "tn": 18,
+   "n": 40,
+   "acc": 0.625
+  },
+  "Hemg": {
+   "tp": 4,
+   "fn": 6,
+   "fp": 2,
+   "tn": 8,
+   "n": 20,
+   "acc": 0.6
+  },
+  "JamieWithofs": {
+   "tp": 3,
+   "fn": 7,
+   "fp": 0,
+   "tn": 10,
+   "n": 20,
+   "acc": 0.65
+  },
+  "median_ms": 5458
+ }
+}
