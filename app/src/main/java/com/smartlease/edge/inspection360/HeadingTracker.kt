@@ -20,6 +20,12 @@ class HeadingTracker(
     var currentAngularVelocity = 0.0f
         private set
 
+    var currentQuadrant: Quadrant = Quadrant.NORTH
+        private set
+
+    var currentAzimuth: Float = 0.0f
+        private set
+
     fun start() {
         rotationSensor?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_UI) }
         gyroSensor?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_UI) }
@@ -53,6 +59,8 @@ class HeadingTracker(
                 in 135.0..225.0 -> Quadrant.SOUTH
                 else -> Quadrant.WEST
             }
+            currentQuadrant = quadrant
+            currentAzimuth = azimuth
             onQuadrantChange(quadrant, azimuth)
         }
     }

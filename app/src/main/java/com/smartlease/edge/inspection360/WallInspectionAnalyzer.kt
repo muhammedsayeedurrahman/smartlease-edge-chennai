@@ -12,19 +12,19 @@ import java.nio.ByteBuffer
 
 class WallInspectionAnalyzer(
     private val headingTracker: HeadingTracker,
-    private val onWallCaptured: (Quadrant, Bitmap, Float) -> Unit,
+    private val onWallCaptured: (Quadrant, Bitmap, Bitmap, Float, Float) -> Unit,
     private val onSpeedWarning: (Boolean) -> Unit
 ) : ImageAnalysis.Analyzer {
 
     private val capturedQuadrants = mutableSetOf<Quadrant>()
-    private var currentQuadrant = Quadrant.NORTH
+    private var manualQuadrant: Quadrant? = null
 
     init {
         headingTracker.start()
     }
 
     fun updateCurrentQuadrant(quadrant: Quadrant) {
-        this.currentQuadrant = quadrant
+        this.manualQuadrant = quadrant
     }
     
     fun reset() {
@@ -37,7 +37,7 @@ class WallInspectionAnalyzer(
 
     @androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
     override fun analyze(imageProxy: ImageProxy) {
-        val quadrant = currentQuadrant
+        val quadrant = manualQuadrant ?: headingTracker.currentQuadrant
 
         // 1. Skip if wall quadrant already captured
         if (capturedQuadrants.contains(quadrant)) {
@@ -58,8 +58,6 @@ class WallInspectionAnalyzer(
         // 3. Sharpness gate: check Laplacian variance on the Y plane
         val yBuffer = imageProxy.image?.planes?.get(0)?.buffer
         if (yBuffer != null) {
-            // computeLaplacianVariance advances the buffer position, so we should duplicate it or handle carefully.
-            // We'll pass a slice/duplicate so we don't consume the original buffer entirely.
             val variance = ImageSharpnessEvaluator.computeLaplacianVariance(
                 yBuffer.duplicate(), imageProxy.width, imageProxy.height
             )
@@ -69,9 +67,13 @@ class WallInspectionAnalyzer(
                 val bitmap = imageProxyToBitmap(imageProxy)
                 if (bitmap != null) {
                     val estimatedZ = 2.0f // Replace with ARCore plane distance if active
+                    val thumbWidth = 320
+                    val thumbHeight = (320f * bitmap.height / bitmap.width).toInt().coerceAtLeast(1)
+                    val thumbnail = Bitmap.createScaledBitmap(bitmap, thumbWidth, thumbHeight, true)
+                    val azimuth = headingTracker.currentAzimuth
 
                     capturedQuadrants.add(quadrant)
-                    onWallCaptured(quadrant, bitmap, estimatedZ)
+                    onWallCaptured(quadrant, bitmap, thumbnail, estimatedZ, azimuth)
                 }
             }
         }

@@ -2,13 +2,22 @@ package com.smartlease.edge.ui.screens
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.widget.Toast
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,10 +26,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.camera.view.PreviewView
@@ -48,6 +61,7 @@ import com.smartlease.edge.ui.theme.ReadoutValueLarge
 import com.smartlease.edge.vision.DefectSegmenter
 import com.smartlease.edge.vision.DefectSegmenterFactory
 import com.smartlease.edge.inspection360.HeadingTracker
+import com.smartlease.edge.inspection360.Quadrant
 import com.smartlease.edge.inspection360.RoomDefectRecord
 import com.smartlease.edge.inspection360.RoomInspectionCoordinator
 import com.smartlease.edge.inspection360.WallInspectionAnalyzer
@@ -55,6 +69,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
+
+/**
+ * Keyframe photo captured along a 360-degree room panorama turn.
+ */
+data class Panorama360Frame(
+    val quadrant: Quadrant,
+    val thumbnail: Bitmap,
+    val azimuth: Float,
+    val defects: List<DefectSegmenter.Defect>,
+    val timestampMs: Long = System.currentTimeMillis()
+)
 
 /** Pre-filled deposit figure -- the demo's own stated amount, not a claim about any real lease. */
 private const val DEFAULT_DEPOSIT_RUPEES = 90_000
@@ -118,6 +143,8 @@ fun WalkthroughScreen(sessionType: SessionType, onReportGenerated: (InspectionRe
     // the same DefectSegmenter as manual capture, so it can't exist until models finish loading.
     var isAutoCaptureMode by remember { mutableStateOf(false) }
     var isMovingTooFast by remember { mutableStateOf(false) }
+    val captured360Frames = remember { mutableStateListOf<Panorama360Frame>() }
+    var selected360Frame by remember { mutableStateOf<Panorama360Frame?>(null) }
 
     // Nothing else in the app has a source for the deposit -- DeductionEngine needs a
     // rupee figure to subtract findings from, and until now nothing ever supplied one.
@@ -200,40 +227,55 @@ fun WalkthroughScreen(sessionType: SessionType, onReportGenerated: (InspectionRe
     // same pattern as "Set baseline" below.
     val roomCoordinator = remember(visionSegmenter) {
         val segmenter = visionSegmenter ?: return@remember null
-        RoomInspectionCoordinator(segmenter) { records ->
-            isAutoCaptureMode = false
-            scope.launch {
-                records.forEach { record ->
-                    if (record.defectClass == RoomDefectRecord.CLEAR) {
-                        findings = findings + LoggedFinding(
-                            Lamp.PASS, record.wall, "clear", "Nothing flagged on this wall"
-                        )
-                    } else {
-                        logFinding(
-                            type = FindingType.VISUAL_DEFECT,
-                            label = "${record.wall}: ${record.label}",
-                            value = "%.2f sq ft".format(record.areaSqFt),
-                            detail = FindingDetail.VisualDefect(
-                                defectClass = record.defectClass,
-                                areaSqFt = record.areaSqFt,
-                                confidence = record.confidence,
-                                fromTrainedModel = segmenter.isTrainedModel
-                            ),
-                            noteText = "360 auto-capture, %.0f%% confidence".format(record.confidence * 100f),
-                            lamp = if (record.confidence >= 0.6f) Lamp.FLAG else Lamp.CAUTION
-                        )
+        RoomInspectionCoordinator(
+            defectSegmenter = segmenter,
+            onWallFrameProcessed = { quad, thumb, defects, az ->
+                captured360Frames.add(
+                    Panorama360Frame(
+                        quadrant = quad,
+                        thumbnail = thumb,
+                        azimuth = az,
+                        defects = defects
+                    )
+                )
+            },
+            onInspectionFinished = { records ->
+                isAutoCaptureMode = false
+                scope.launch {
+                    records.forEach { record ->
+                        if (record.defectClass == RoomDefectRecord.CLEAR) {
+                            findings = findings + LoggedFinding(
+                                Lamp.PASS, record.wall, "clear", "Nothing flagged on this wall"
+                            )
+                        } else {
+                            logFinding(
+                                type = FindingType.VISUAL_DEFECT,
+                                label = "${record.wall}: ${record.label}",
+                                value = "%.2f sq ft".format(record.areaSqFt),
+                                detail = FindingDetail.VisualDefect(
+                                    defectClass = record.defectClass,
+                                    areaSqFt = record.areaSqFt,
+                                    confidence = record.confidence,
+                                    fromTrainedModel = segmenter.isTrainedModel
+                                ),
+                                noteText = "360 auto-capture, %.0f%% confidence".format(record.confidence * 100f),
+                                lamp = if (record.confidence >= 0.6f) Lamp.FLAG else Lamp.CAUTION
+                            )
+                        }
                     }
                 }
             }
-        }
+        )
     }
 
     val wallAnalyzer = remember(roomCoordinator) {
         val coordinator = roomCoordinator ?: return@remember null
-        val tracker = HeadingTracker(context) { _, _ -> } // quadrant read internally per-frame
+        val tracker = HeadingTracker(context) { _, _ -> }
         WallInspectionAnalyzer(
             headingTracker = tracker,
-            onWallCaptured = { quad, bmp, z -> coordinator.onWallKeyframeAcquired(quad, bmp, z) },
+            onWallCaptured = { quad, bmp, thumb, z, az ->
+                coordinator.onWallKeyframeAcquired(quad, bmp, thumb, z, az)
+            },
             onSpeedWarning = { movingTooFast -> isMovingTooFast = movingTooFast }
         )
     }
@@ -401,6 +443,126 @@ fun WalkthroughScreen(sessionType: SessionType, onReportGenerated: (InspectionRe
             }
         }
 
+        // --- 360 Live Panorama Filmstrip (Frame-by-Frame below viewfinder) ---
+        if (isAutoCaptureMode || captured360Frames.isNotEmpty()) {
+            Spacer(Modifier.height(10.dp))
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                    .padding(10.dp)
+            ) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.Explore,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            "360° PANORAMA FRAMES (${captured360Frames.size}/4)",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Text(
+                        when {
+                            captured360Frames.size >= 4 -> "COMPLETE"
+                            isAutoCaptureMode -> "RECORDING 360..."
+                            else -> "${captured360Frames.size} CAPTURED"
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (captured360Frames.size >= 4) Color(0xFF2E7D32) else MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                if (captured360Frames.isEmpty()) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "Turn slowly in a full circle. Photos will appear here frame-by-frame as each wall is captured.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    Spacer(Modifier.height(8.dp))
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        items(captured360Frames) { frame ->
+                            PanoramaFrameCard(frame = frame, onClick = { selected360Frame = frame })
+                        }
+                    }
+                }
+            }
+        }
+
+        selected360Frame?.let { frame ->
+            AlertDialog(
+                onDismissRequest = { selected360Frame = null },
+                confirmButton = {
+                    TextButton(onClick = { selected360Frame = null }) {
+                        Text("Close")
+                    }
+                },
+                title = {
+                    Text("${frame.quadrant.name} Wall (%.0f°)".format(frame.azimuth))
+                },
+                text = {
+                    Column(
+                        Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Image(
+                            bitmap = frame.thumbnail.asImageBitmap(),
+                            contentDescription = frame.quadrant.name,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(180.dp)
+                                .clip(RoundedCornerShape(8.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        if (frame.defects.isEmpty()) {
+                            Text(
+                                "No defects detected on this wall.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color(0xFF2E7D32)
+                            )
+                        } else {
+                            Text(
+                                "Detected ${frame.defects.size} defect(s):",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            frame.defects.forEach { defect ->
+                                Text(
+                                    "• ${defect.label} (%.2f sq ft, %.0f%% conf)".format(
+                                        defect.areaSqFtEstimate, defect.confidence * 100f
+                                    ),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+                }
+            )
+        }
+
         Spacer(Modifier.height(14.dp))
 
         // --- Controls. Capture is the primary action and is weighted as such. --------------
@@ -486,7 +648,10 @@ fun WalkthroughScreen(sessionType: SessionType, onReportGenerated: (InspectionRe
                 enabled = !busy && !modelsLoading && hasCameraPermission && wallAnalyzer != null,
                 onClick = {
                     isAutoCaptureMode = !isAutoCaptureMode
-                    if (isAutoCaptureMode) wallAnalyzer?.reset()
+                    if (isAutoCaptureMode) {
+                        captured360Frames.clear()
+                        wallAnalyzer?.reset()
+                    }
                 },
                 modifier = Modifier.weight(1f).height(52.dp),
                 colors = ButtonDefaults.outlinedButtonColors(
@@ -815,5 +980,78 @@ fun WalkthroughScreen(sessionType: SessionType, onReportGenerated: (InspectionRe
                 style = MaterialTheme.typography.titleMedium
             )
         }
+    }
+}
+
+@Composable
+private fun PanoramaFrameCard(
+    frame: Panorama360Frame,
+    onClick: () -> Unit
+) {
+    val hasDefects = frame.defects.isNotEmpty()
+    val borderColor = if (hasDefects) Color(0xFFE57373) else Color(0xFF81C784)
+
+    Column(
+        modifier = Modifier
+            .width(96.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.5.dp, borderColor, RoundedCornerShape(8.dp))
+            .clickable { onClick() }
+            .padding(4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(72.dp)
+                .clip(RoundedCornerShape(6.dp))
+        ) {
+            Image(
+                bitmap = frame.thumbnail.asImageBitmap(),
+                contentDescription = frame.quadrant.name,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+            // Quadrant badge overlay
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(3.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color.Black.copy(alpha = 0.75f))
+                    .padding(horizontal = 4.dp, vertical = 1.dp)
+            ) {
+                Text(
+                    frame.quadrant.name,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 9.sp
+                )
+            }
+            // Defect indicator dot
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(4.dp)
+                    .size(8.dp)
+                    .background(if (hasDefects) Color.Red else Color(0xFF2E7D32), CircleShape)
+            )
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            if (hasDefects) "${frame.defects.size} fault(s)" else "Clear",
+            style = MaterialTheme.typography.labelSmall,
+            color = if (hasDefects) MaterialTheme.colorScheme.error else Color(0xFF2E7D32),
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1
+        )
+        Text(
+            "%.0f°".format(frame.azimuth),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 9.sp
+        )
     }
 }
