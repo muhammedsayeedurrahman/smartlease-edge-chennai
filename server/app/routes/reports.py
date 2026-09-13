@@ -115,7 +115,26 @@ def create_report(body: ReportCreateRequest, request: Request):
         server_received_at_epoch_ms=now_epoch_ms(),
         access_token_sha256=hash_token(report_token),
     )
-    stored = repo.insert_report(record)
+    try:
+        stored = repo.insert_report(record)
+    except sqlite3.IntegrityError:
+        # Another request may have inserted this id after our optimistic read above.
+        # Treat a matching row exactly like any other idempotent retry; a different
+        # digest remains a tamper signal rather than an internal-server error.
+        existing = repo.get_report(body.reportId)
+        if existing is None:
+            # The constraint error was not the report-id race we can resolve here.
+            # Re-raise it for the application's standard unexpected-error handler.
+            raise
+        if existing.digest_sha256 != body.digestSha256:
+            raise DigestMismatchError(
+                f"Report {body.reportId} already exists with a different "
+                "digest; this is a tamper signal, not an ordinary duplicate."
+            )
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=_create_response(existing).model_dump(),
+        )
     return _create_response(stored, report_token=report_token)
 
 

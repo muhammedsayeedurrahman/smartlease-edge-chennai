@@ -16,6 +16,7 @@ fun buildTimeSyncConfig(): SyncConfig = SyncConfig(
     // key was actually supplied at build time (see app/build.gradle.kts). This keeps the
     // failure visible in one place -- the build command -- instead of as a recurring error
     // banner in front of whoever is holding the phone.
+    baseUrl = BuildConfig.SMARTLEASE_BASE_URL.ifBlank { SyncConfig.DEFAULT_BASE_URL },
     syncEnabled = BuildConfig.SMARTLEASE_API_KEY.isNotBlank(),
     apiKey = BuildConfig.SMARTLEASE_API_KEY.ifBlank { null }
 )

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug-build-only exception: allows plain HTTP to loopback addresses so a debug build can
+  talk to a backend running on the developer's own machine via `adb reverse`, without
+  weakening the release build's cleartext policy (this file lives under src/debug, so it is
+  never merged into a release APK).
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">10.0.2.2</domain>
+    </domain-config>
+</network-security-config>
