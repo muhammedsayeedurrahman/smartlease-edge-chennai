@@ -26,4 +26,23 @@ object TemplateReportNarrator : ReportNarrator {
         val labels = findings.joinToString("; ") { it.label }
         return "$count finding(s) recorded. Items: $labels. Severity breakdown: $severities."
     }
+
+    /**
+     * Deterministic fallback for the "Document Verification" section: it lists what was
+     * recorded and points the reader at the lease terms rather than judging compliance itself,
+     * because comparing free-text lease language against a finding label is exactly the
+     * judgement call a rule-based composer cannot make honestly. [GemmaReportNarrator] is the
+     * implementation that actually attempts that comparison; this is what prints when it is
+     * unavailable or its output is rejected.
+     */
+    fun composeDocumentVerification(findings: List<InspectionEntity>, leaseDosAndDonts: String): String {
+        if (findings.isEmpty()) {
+            return "No findings were recorded in this session, so there is nothing to check " +
+                "against the uploaded lease's dos and don'ts below."
+        }
+        val labels = findings.joinToString("; ") { it.label }
+        return "${findings.size} finding(s) were recorded in this session: $labels. This " +
+            "rule-based summary does not compare them against the lease -- read the findings " +
+            "above alongside the lease's dos and don'ts below and judge compliance yourself."
+    }
 }

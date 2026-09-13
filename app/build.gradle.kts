@@ -51,6 +51,13 @@ android {
             ?: System.getenv("SMARTLEASE_API_KEY")
             ?: ""
         buildConfigField("String", "SMARTLEASE_API_KEY", "\"$smartleaseApiKey\"")
+
+        // The endpoint is configured alongside the key, not hard-coded in source. It must
+        // include the API path and a trailing slash (validated by SyncConfig at startup).
+        val smartleaseBaseUrl = (project.findProperty("smartleaseBaseUrl") as String?)
+            ?: System.getenv("SMARTLEASE_BASE_URL")
+            ?: ""
+        buildConfigField("String", "SMARTLEASE_BASE_URL", "\"$smartleaseBaseUrl\"")
     }
 
     buildTypes {
@@ -79,6 +86,16 @@ android {
         // breaks LiteModuleLoader's ability to mmap them straight out of the APK.
         noCompress += "ptl"
         noCompress += "litertlm"
+    }
+
+    testOptions {
+        unitTests {
+            // ModelLoadBalancer logs through android.util.Log, which the android.jar stub
+            // throws on by default in a plain JVM unit test ("Method i not mocked"). Unlike
+            // org.json above, a defaulted Log call is harmless -- nothing reads its return
+            // value -- so this is the narrow fix rather than pulling in Robolectric.
+            isReturnDefaultValues = true
+        }
     }
 }
 
@@ -147,14 +164,14 @@ dependencies {
     implementation(libs.pytorch.android.lite)
     implementation(libs.pytorch.torchvision.lite)
 
-    // On-device report narration (com.smartlease.edge.narration). Runtime only: the Gemma
-    // weights are not in the APK and are not redistributed with it -- see docs/GEMMA_SETUP.md.
-    // The app builds, installs and produces reports with no model file present; narration
-    // falls back to rule-based templating and says so on the page.
-    implementation(libs.mediapipe.tasks.genai)
-
-    // LiteRT-LM runtime: loads the .litertlm container (Gemma 4 / Gemma 3n) that the MediaPipe
-    // runtime above cannot read. Same "weights are not in the APK" guarantee -- runtime only.
+    // On-device report narration (com.smartlease.edge.narration) and document analysis
+    // (com.smartlease.edge.domain.llm) both run on this LiteRT-LM runtime, which loads the
+    // .litertlm container (Gemma 4 / Gemma 3n). The Gemma weights are not in the APK and are
+    // not redistributed with it -- see docs/GEMMA_SETUP.md. The app builds, installs and
+    // produces reports/summaries with no model file present; both fall back to templating/raw
+    // text and say so. The deprecated MediaPipe `tasks-genai` LlmInference API (which cannot
+    // load .litertlm containers -- it fails at tokenizer init with a SentencePiece parse error)
+    // has been removed now that DocumentAnalyzer no longer depends on it.
     // Its Kotlin 2.4.0 stdlib/reflect are aligned up by the resolutionStrategy above.
     implementation(libs.litertlm.android)
 

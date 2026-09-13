@@ -58,6 +58,8 @@ import com.smartlease.edge.sync.SyncClientFactory
 import com.smartlease.edge.sync.SyncUiState
 import com.smartlease.edge.sync.buildTimeSyncConfig
 import com.smartlease.edge.sync.syncReportUpload
+import com.smartlease.edge.ui.CapturedFrame
+import com.smartlease.edge.ui.Room
 import com.smartlease.edge.ui.components.Lamp
 import com.smartlease.edge.ui.components.Panel
 import com.smartlease.edge.ui.components.StatusLamp
@@ -82,6 +84,11 @@ import java.util.Locale
 fun ReportScreen(
     report: InspectionReport?,
     onBack: () -> Unit,
+    // The rooms this report was generated from, for the "Move-in vs move-out" comparison
+    // panel. Defaulted empty rather than made non-null with a fetch inside this screen: the
+    // frames live only in AppViewModel's in-memory state, and this screen has no propertyId
+    // in its own route to fetch them by -- the caller already has both and hands them over.
+    rooms: List<Room> = emptyList(),
     // Carries the per-report token to the countersign screen, which needs it to record the
     // signature server-side. Null is a legitimate value (sync off, upload failed, token never
     // issued) and produces an honest "not synced" line there rather than a blocked button:
@@ -242,6 +249,10 @@ fun ReportScreen(
             Modifier.weight(1f).padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            item {
+                ImageComparisonPanel(rooms)
+            }
+
             items(report.sections) { section ->
                 ElevatedCard(
                     modifier = Modifier.fillMaxWidth(),
@@ -379,6 +390,94 @@ fun ReportScreen(
                 Spacer(Modifier.height(20.dp))
             }
         }
+    }
+}
+
+/**
+ * Shows the same surface at move-in and move-out side by side, for every room/surface where
+ * both were actually captured. Renders nothing when there is no such pair -- a move-in-only
+ * report, or a move-out room with no matching move-in capture, gets no panel rather than an
+ * empty or apologetic one. Deliberately visual-only: this does not score, price, or diff the
+ * two images in any way, only places them next to each other for a human to compare -- the
+ * deduction engine's own findings-based pricing is the only thing on this report that prices
+ * anything.
+ */
+@Composable
+private fun ImageComparisonPanel(rooms: List<Room>) {
+    val comparisons = remember(rooms) {
+        rooms.mapNotNull { room ->
+            val before = room.moveInFrames.groupBy { it.surfaceType }
+            val after = room.moveOutFrames.groupBy { it.surfaceType }
+            val shared = before.keys.intersect(after.keys).sorted()
+            if (shared.isEmpty()) return@mapNotNull null
+            val pairs = shared.mapNotNull { surface ->
+                val beforeFrame = before[surface]?.firstOrNull() ?: return@mapNotNull null
+                val afterFrame = after[surface]?.firstOrNull() ?: return@mapNotNull null
+                Triple(surface, beforeFrame, afterFrame)
+            }
+            if (pairs.isEmpty()) null else room to pairs
+        }
+    }
+    if (comparisons.isEmpty()) return
+
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Text(
+                "Move-in vs move-out",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "The same surface captured at both sessions, for direct comparison. Not " +
+                    "scored or priced -- the findings and balance sheet elsewhere on this " +
+                    "report are.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            comparisons.forEach { (room, pairs) ->
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    room.type,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                pairs.forEach { (surface, beforeFrame, afterFrame) ->
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        surface,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ComparisonThumbnail(beforeFrame, "Move-in", Modifier.weight(1f))
+                        ComparisonThumbnail(afterFrame, "Move-out", Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ComparisonThumbnail(frame: CapturedFrame, caption: String, modifier: Modifier = Modifier) {
+    Column(modifier) {
+        Image(
+            bitmap = frame.bitmap.asImageBitmap(),
+            contentDescription = "$caption photo",
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(120.dp)
+                .clip(RoundedCornerShape(8.dp))
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(caption, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

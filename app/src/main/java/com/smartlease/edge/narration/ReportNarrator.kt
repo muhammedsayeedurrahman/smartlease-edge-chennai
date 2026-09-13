@@ -29,6 +29,27 @@ interface ReportNarrator {
      */
     suspend fun narrate(sectionTitle: String, findings: List<InspectionEntity>): Narration
 
+    /**
+     * Compares this session's findings against the dos-and-don'ts extracted from the tenant's
+     * uploaded lease, for the report's "Document Verification" section. Unlike [narrate], this
+     * is explicitly cross-document -- the model is given both the findings and the lease text
+     * -- so it carries the same rules again in its own prompt rather than inheriting them
+     * silently: no invented finding, no cost, no legal verdict, only whether what was recorded
+     * plausibly matches what the lease asked for.
+     *
+     * Default implementation is [TemplateReportNarrator]'s deterministic compose, so a narrator
+     * that does not override this (or one that falls back internally) still produces a section
+     * rather than an absent one. [findings] may be empty -- a session with no defects is still
+     * worth checking against the lease terms.
+     */
+    suspend fun narrateDocumentVerification(
+        findings: List<InspectionEntity>,
+        leaseDosAndDonts: String
+    ): Narration = Narration(
+        text = TemplateReportNarrator.composeDocumentVerification(findings, leaseDosAndDonts),
+        source = NarrationSource.TEMPLATE
+    )
+
     /** Releases any native resources. Safe to call more than once. */
     fun close() {}
 }

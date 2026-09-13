@@ -11,6 +11,11 @@ import android.util.Log
  * not, and the app tells them which situation they are in. That keeps the app's claim about
  * itself ("this report was written by an on-device model") tied to a file that either exists
  * and loaded, or does not.
+ *
+ * Before loading, [ModelLoadBalancer] checks available RAM and thermal state so that
+ * attempting to load a multi-gigabyte model does not get the process killed by Android's Low
+ * Memory Killer -- it either scales the token budget down or skips straight to
+ * [TemplateReportNarrator] with an honest reason.
  */
 object ReportNarratorFactory {
 
@@ -45,9 +50,11 @@ object ReportNarratorFactory {
             is GemmaModelLocator.Location.Missing ->
                 "rule-based templating - no model file in " + location.searched.joinToString(" or ")
 
-            is GemmaModelLocator.Location.Found ->
+            is GemmaModelLocator.Location.Found -> {
+                val availMb = ModelLoadBalancer.getAvailableMemoryBytes(context) / (1024 * 1024)
                 "Gemma model found - ${location.file.name} " +
-                    "(${location.file.length() / (1024 * 1024)} MB), loaded at report time"
+                    "(${location.file.length() / (1024 * 1024)} MB, ${availMb} MB RAM free), loaded at report time"
+            }
         }
 
     fun create(context: Context): Selection =
@@ -64,23 +71,36 @@ object ReportNarratorFactory {
 
             is GemmaModelLocator.Location.Found -> {
                 val megabytes = location.file.length() / (1024 * 1024)
-                val gemma = GemmaReportNarrator.tryCreate(context, location.file)
-                if (gemma == null) {
-                    // Found but unusable is a distinct state from absent, and worth saying so:
-                    // it is the difference between "you have not set this up" and "you set it
-                    // up and it is broken", which need different things from the user.
+                val decision = ModelLoadBalancer.assess(context, location.file)
+
+                if (decision is ModelLoadBalancer.LoadDecision.Skip) {
+                    Log.w(TAG, "Load balancer skipped LLM loading: ${decision.reason}")
                     Selection(
                         narrator = TemplateReportNarrator,
-                        status = "rule-based templating - ${location.file.name} " +
-                            "(${megabytes} MB) failed to load",
+                        status = "rule-based templating - ${decision.reason}",
                         usingModel = false
                     )
                 } else {
-                    Selection(
-                        narrator = gemma,
-                        status = "on-device Gemma - ${location.file.name} (${megabytes} MB)",
-                        usingModel = true
-                    )
+                    val maxTokens = decision.recommendedMaxTokens
+                    val gemma = GemmaReportNarrator.tryCreate(context, location.file, maxTokens)
+                    if (gemma == null) {
+                        // Found but unusable is a distinct state from absent, and worth saying so:
+                        // it is the difference between "you have not set this up" and "you set it
+                        // up and it is broken", which need different things from the user.
+                        Selection(
+                            narrator = TemplateReportNarrator,
+                            status = "rule-based templating - ${location.file.name} " +
+                                "(${megabytes} MB) failed to load",
+                            usingModel = false
+                        )
+                    } else {
+                        val budgetNote = if (decision is ModelLoadBalancer.LoadDecision.Tight) " [budget: ${maxTokens}t]" else ""
+                        Selection(
+                            narrator = gemma,
+                            status = "on-device Gemma - ${location.file.name} (${megabytes} MB)$budgetNote",
+                            usingModel = true
+                        )
+                    }
                 }
             }
         }

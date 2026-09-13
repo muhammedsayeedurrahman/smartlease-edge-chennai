@@ -44,7 +44,8 @@ import java.io.File
  */
 class GemmaReportNarrator private constructor(
     private val engine: Engine,
-    private val modelName: String
+    private val modelName: String,
+    private val maxTokens: Int
 ) : ReportNarrator {
 
     override suspend fun narrate(
@@ -94,7 +95,7 @@ class GemmaReportNarrator private constructor(
                 temperature = 0.0,
                 seed = 0
             ),
-            maxOutputToken = MAX_TOKENS
+            maxOutputToken = maxTokens
         )
 
     /**
@@ -132,6 +133,73 @@ class GemmaReportNarrator private constructor(
         """.trimIndent()
     }
 
+    override suspend fun narrateDocumentVerification(
+        findings: List<InspectionEntity>,
+        leaseDosAndDonts: String
+    ): Narration {
+        val fallback = TemplateReportNarrator.composeDocumentVerification(findings, leaseDosAndDonts)
+
+        val raw = withContext(Dispatchers.Default) {
+            runCatching {
+                engine.createConversation(conversationConfig()).use { conversation ->
+                    conversation.sendMessage(
+                        documentVerificationPrompt(findings, leaseDosAndDonts)
+                    ).toString()
+                }
+            }
+                .onFailure { Log.w(TAG, "Gemma document verification failed; using template", it) }
+                .getOrNull()
+        } ?: return Narration(fallback, NarrationSource.TEMPLATE, "generation failed ($modelName)")
+
+        val text = raw.trim()
+        return when (val verdict = NarrationAudit.check(text, findings)) {
+            is NarrationAudit.Result.Accepted -> Narration(text, NarrationSource.GEMMA)
+            is NarrationAudit.Result.Rejected -> {
+                Log.w(TAG, "Gemma document verification rejected: ${verdict.reason}")
+                Narration(fallback, NarrationSource.TEMPLATE, "rejected: ${verdict.reason}")
+            }
+        }
+    }
+
+    /**
+     * Unlike [prompt], this crosses two documents -- the recorded findings and the lease's own
+     * dos and don'ts -- so the rules repeat what [NarrationAudit] already enforces (no money,
+     * no invented findings) and add the one specific to this section: no verdict on legal
+     * compliance, only a plain comparison. The model has no authority to decide a dispute; it
+     * can only point out where the two documents agree or disagree.
+     */
+    private fun documentVerificationPrompt(findings: List<InspectionEntity>, leaseDosAndDonts: String): String {
+        val lines = if (findings.isEmpty()) {
+            "(none recorded)"
+        } else {
+            findings.joinToString("\n") { "- ${it.label} [severity: ${it.severity}]" }
+        }
+
+        return """
+            You are comparing a rental property inspection against that property's lease.
+
+            Findings recorded by the inspection (${findings.size} total):
+            $lines
+
+            Lease dos and don'ts (extracted from the uploaded agreement):
+            $leaseDosAndDonts
+
+            Write a single plain paragraph, 2 to 4 sentences, noting where the findings above
+            relate to the lease's dos and don'ts -- for example, a finding that matches
+            something the lease says not to do, or findings that do not relate to any lease
+            term.
+
+            Rules:
+            - Only reference findings from the list above and terms from the lease text above.
+              Do not invent a finding, a lease term, or a location not present in either.
+            - Do not estimate or mention any cost, price, or rupee amount.
+            - Do not decide fault, liability, or legal compliance. Describe what relates to
+              what; do not conclude who is right or who must pay.
+            - If you state a number of findings, it must be exactly ${findings.size}.
+            - Write prose only. No headings, no bullet points, no markdown.
+        """.trimIndent()
+    }
+
     override fun close() {
         runCatching { engine.close() }
     }
@@ -140,11 +208,11 @@ class GemmaReportNarrator private constructor(
         private const val TAG = "GemmaNarrator"
 
         /**
-         * Token budget. Small on purpose: the task is one paragraph, and a large window costs
-         * both memory and the first-token latency a user waits through after tapping
-         * "Generate report".
+         * Default token budget when the caller has no [ModelLoadBalancer] recommendation.
+         * Small on purpose: the task is one paragraph, and a large window costs both memory
+         * and the first-token latency a user waits through after tapping "Generate report".
          */
-        private const val MAX_TOKENS = 640
+        const val DEFAULT_MAX_TOKENS = 640
 
         /**
          * Loads the model at [file]. Returns null and logs rather than throwing -- a phone
@@ -156,8 +224,12 @@ class GemmaReportNarrator private constructor(
          * would fail GPU init, and we would rather narrate slowly on CPU than fall back to the
          * template. Both are tried before giving up. NPU is not attempted here -- it needs a
          * per-SoC library bundle the app does not ship.
+         *
+         * @param maxTokens output token budget, normally [ModelLoadBalancer]'s recommendation
+         * for the current RAM/thermal state -- constrained on a tight device, [DEFAULT_MAX_TOKENS]
+         * otherwise.
          */
-        fun tryCreate(context: Context, file: File): GemmaReportNarrator? {
+        fun tryCreate(context: Context, file: File, maxTokens: Int = DEFAULT_MAX_TOKENS): GemmaReportNarrator? {
             // Named pairs rather than `backend::class.simpleName`: reading the class name
             // reflectively pulls in kotlin-reflect at runtime, and the version LiteRT-LM drags
             // in is incompatible with the project's Kotlin, so touching Reflection here crashed
@@ -179,7 +251,7 @@ class GemmaReportNarrator private constructor(
 
                 if (engine != null) {
                     Log.i(TAG, "Loaded ${file.name} on $name")
-                    return GemmaReportNarrator(engine, file.name)
+                    return GemmaReportNarrator(engine, file.name, maxTokens)
                 }
             }
             Log.w(TAG, "Could not load Gemma model at ${file.absolutePath} on any backend")

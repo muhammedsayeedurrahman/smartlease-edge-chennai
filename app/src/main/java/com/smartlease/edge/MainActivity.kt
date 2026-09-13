@@ -27,6 +27,7 @@ import com.smartlease.edge.report.InspectionReport
 import com.smartlease.edge.report.PropertyReportBuilder
 import com.smartlease.edge.report.ReportGenerator
 import com.smartlease.edge.ui.AppViewModel
+import com.smartlease.edge.ui.Room
 import com.smartlease.edge.ui.screens.*
 import com.smartlease.edge.ui.theme.SmartLeaseEdgeTheme
 import kotlinx.coroutines.Dispatchers
@@ -88,6 +89,10 @@ fun SmartLeaseApp(
     // hands it here so the countersign screen can record the signature server-side; null is
     // a legitimate value and produces an honest "not synced" line there, never a block.
     var generatedReportToken by remember { mutableStateOf<String?>(null) }
+    // The rooms behind the last generated report, so ReportScreen can render move-in/move-out
+    // image comparisons -- captured at generation time rather than re-fetched from the
+    // ViewModel by ReportScreen itself, since ReportScreen has no propertyId in its route.
+    var generatedReportRooms by remember { mutableStateOf<List<Room>>(emptyList()) }
 
     val startDestination = if (isFirstLaunch) "welcome" else "home"
 
@@ -171,6 +176,15 @@ fun SmartLeaseApp(
                                 sessionId = sessionId,
                                 sessionType = sessionType
                             )
+                            // The uploaded lease's dos-and-don'ts, if any -- feeds the report's
+                            // "Dos & Don'ts" and "Document Verification" sections. A property
+                            // with no lease on file gets neither section (see buildReport).
+                            val agreement = com.smartlease.edge.data.AppDatabase.get(context)
+                                .propertyDao()
+                                .getRentalAgreementForProperty(propertyId)
+                            val leaseSource = agreement?.dosAndDontsSource
+                                ?.let { runCatching { com.smartlease.edge.narration.NarrationSource.valueOf(it) }.getOrNull() }
+                                ?: com.smartlease.edge.narration.NarrationSource.TEMPLATE
                             // Selected per report rather than held for the process
                             // lifetime: a loaded Gemma model pins hundreds of megabytes, and
                             // a rental inspection produces a report every few minutes, not
@@ -190,15 +204,18 @@ fun SmartLeaseApp(
                                     // question is asked.
                                     baselineKeys = emptySet(),
                                     sessionType = sessionType,
-                                    narrator = selection.narrator
+                                    narrator = selection.narrator,
+                                    leaseDosAndDonts = agreement?.dosAndDontsSummary,
+                                    leaseDosAndDontsSource = leaseSource
                                 )
                             } finally {
                                 selection.narrator.close()
                             }
-                            ReportGenerator.renderToPdf(context, built)
+                            ReportGenerator.renderToPdf(context, built, rooms = viewModel.getRoomsForProperty(propertyId))
                             built
                         }
                         generatedReport = report
+                        generatedReportRooms = viewModel.getRoomsForProperty(propertyId)
                         generatedReportToken = null
                         navController.navigate("report/${report.sessionId}")
                     }
@@ -211,6 +228,7 @@ fun SmartLeaseApp(
         ) {
             ReportScreen(
                 report = generatedReport,
+                rooms = generatedReportRooms,
                 onBack = { navController.popBackStack() },
                 onCountersign = { reportToken ->
                     generatedReportToken = reportToken
