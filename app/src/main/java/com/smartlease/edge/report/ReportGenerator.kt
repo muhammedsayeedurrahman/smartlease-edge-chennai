@@ -18,6 +18,9 @@ import com.smartlease.edge.narration.NarrationSource
 import com.smartlease.edge.narration.ReportNarrator
 import com.smartlease.edge.narration.TemplateReportNarrator
 import com.smartlease.edge.sync.buildTimeSyncConfig
+import com.smartlease.edge.ui.CapturedFrame
+import com.smartlease.edge.ui.Room
+import com.smartlease.edge.vision.describeFault
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
@@ -62,6 +65,13 @@ object ReportGenerator {
      * that every existing call site keeps the deterministic behaviour it had; a caller that
      * wants model narration passes the one [com.smartlease.edge.narration.ReportNarratorFactory]
      * selected for this device.
+     * @param leaseDosAndDonts the dos-and-don'ts text [com.smartlease.edge.domain.llm.DocumentAnalyzer]
+     * extracted from this property's uploaded lease, or null when no lease was uploaded -- in
+     * which case neither of the two sections below is added, rather than printing an empty or
+     * placeholder one.
+     * @param leaseDosAndDontsSource who wrote [leaseDosAndDonts] -- carried onto the "Dos &
+     * Don'ts" section the same way every other section's prose carries its narrator, so the
+     * page can credit it honestly instead of implying every lease summary came from a model.
      */
     suspend fun buildReport(
         sessionId: String,
@@ -70,7 +80,9 @@ object ReportGenerator {
         depositRupees: Int? = null,
         baselineKeys: Set<String> = emptySet(),
         sessionType: SessionType = SessionType.MOVE_OUT,
-        narrator: ReportNarrator = TemplateReportNarrator
+        narrator: ReportNarrator = TemplateReportNarrator,
+        leaseDosAndDonts: String? = null,
+        leaseDosAndDontsSource: NarrationSource = NarrationSource.TEMPLATE
     ): InspectionReport {
         val sections = findings.groupBy { it.findingType }.map { (type, items) ->
             val title = type.name.replace('_', ' ')
@@ -79,6 +91,23 @@ object ReportGenerator {
                 title = title,
                 body = narration.text,
                 narrationSource = narration.source
+            )
+        }.toMutableList()
+
+        // Only added when a lease was actually uploaded for this property -- a report for a
+        // property with no lease on file gets no "Dos & Don'ts" or "Document Verification"
+        // section at all, rather than one that says so in its body text.
+        if (!leaseDosAndDonts.isNullOrBlank()) {
+            sections += ReportSection(
+                title = "Dos & Don'ts",
+                body = leaseDosAndDonts,
+                narrationSource = leaseDosAndDontsSource
+            )
+            val verification = narrator.narrateDocumentVerification(findings, leaseDosAndDonts)
+            sections += ReportSection(
+                title = "Document Verification",
+                body = verification.text,
+                narrationSource = verification.source
             )
         }
 
@@ -127,12 +156,17 @@ object ReportGenerator {
      * from the same build-time config the sync code itself uses rather than passed by each
      * caller -- a screen that forgot to pass it would silently print the wrong claim on an
      * evidentiary document.
+     * @param rooms the rooms this report was generated from, for the "Move-in vs move-out"
+     * page -- see [drawImageComparison]. Empty is a legitimate value (a move-in-only report,
+     * or a caller that has not wired rooms through yet); the page is simply omitted then,
+     * exactly like [ReportScreen]'s on-screen panel of the same data.
      */
     fun renderToPdf(
         context: Context,
         report: InspectionReport,
         countersignatures: List<CountersignatureEntity> = emptyList(),
-        syncEnabled: Boolean = buildTimeSyncConfig().syncEnabled
+        syncEnabled: Boolean = buildTimeSyncConfig().syncEnabled,
+        rooms: List<Room> = emptyList()
     ): File {
         val document = PdfDocument()
         val titlePaint = Paint().apply { textSize = 20f; isFakeBoldText = true }
@@ -161,6 +195,14 @@ object ReportGenerator {
         canvas.drawText("Captured and analysed on-device. Photos, video and audio never leave this phone.", MARGIN.toFloat(), y, metaPaint); y += 24
 
         canvas.drawText("Verdict: ${report.overallVerdict}", MARGIN.toFloat(), y, headerPaint); y += 26
+
+        // Same reading order as ReportScreen: photographic evidence right after the verdict,
+        // before the written findings that describe it.
+        run {
+            val cursor = PdfCursor(document, page, canvas, pageNumber, y)
+            drawImageComparison(cursor, report, rooms)
+            page = cursor.page; canvas = cursor.canvas; pageNumber = cursor.pageNumber; y = cursor.y
+        }
 
         for (section in report.sections) {
             if (y > PAGE_HEIGHT - 120) {
@@ -345,6 +387,85 @@ object ReportGenerator {
         page = document.startPage(PdfDocument.PageInfo.Builder(PAGE_WIDTH, PAGE_HEIGHT, pageNumber).create())
         canvas = page.canvas
         y = MARGIN.toFloat()
+    }
+
+    /**
+     * The same surface at move-in and move-out, placed side by side, for every room/surface
+     * where both were actually captured -- the printed twin of [ReportScreen]'s on-screen
+     * panel of the same data. Draws nothing when [rooms] yields no such pair, exactly like
+     * that panel: a move-in-only report gets no page here, not an empty one.
+     *
+     * Visual-only in one sense: this does not diff or score the two bitmaps itself -- that
+     * would be a claim about what changed between them, pixel to pixel, which this layout has
+     * no basis to make. What it does print underneath each pair is the move-out frame's own
+     * already-computed defects (the same [com.smartlease.edge.vision.DefectSegmenter.Defect]
+     * list the findings section and deduction engine were built from) -- naming the fault next
+     * to the photo it came from, not inventing a new one.
+     */
+    private fun drawImageComparison(cursor: PdfCursor, report: InspectionReport, rooms: List<Room>) {
+        val comparisons = rooms.mapNotNull { room ->
+            val before = room.moveInFrames.groupBy { it.surfaceType }
+            val after = room.moveOutFrames.groupBy { it.surfaceType }
+            val shared = before.keys.intersect(after.keys).sorted()
+            if (shared.isEmpty()) return@mapNotNull null
+            val pairs = shared.mapNotNull { surface ->
+                val beforeFrame = before[surface]?.firstOrNull() ?: return@mapNotNull null
+                val afterFrame = after[surface]?.firstOrNull() ?: return@mapNotNull null
+                Triple(surface, beforeFrame, afterFrame)
+            }
+            if (pairs.isEmpty()) null else room to pairs
+        }
+        if (comparisons.isEmpty()) return
+
+        val headerPaint = TextPaint().apply { textSize = 13f; isFakeBoldText = true }
+        val labelPaint = TextPaint().apply { textSize = 9f; color = 0xFF666666.toInt() }
+        val captionPaint = TextPaint().apply { textSize = 8f; color = 0xFF333333.toInt() }
+        val notePaint = TextPaint().apply { textSize = 8.5f; color = 0xFF333333.toInt() }
+        val faultPaint = TextPaint().apply { textSize = 8.5f; color = 0xFFAA2200.toInt() }
+
+        cursor.breakPageIfBelow(report, 200)
+        cursor.canvas.drawText("Move-in vs move-out", MARGIN.toFloat(), cursor.y, headerPaint)
+        cursor.y += 16
+        cursor.drawWrapped(
+            "The same surface captured at both sessions, placed side by side, with the " +
+                "move-out defects the segmenter found on that surface printed underneath. " +
+                "Priced in full in the findings and deduction sheet elsewhere in this report.",
+            notePaint
+        )
+
+        val thumbWidth = (PAGE_WIDTH - MARGIN * 2 - 12) / 2
+        val thumbHeight = 130
+
+        comparisons.forEach { (room, pairs) ->
+            cursor.breakPageIfBelow(report, 60)
+            cursor.canvas.drawText(room.type, MARGIN.toFloat(), cursor.y, labelPaint)
+            cursor.y += 14
+
+            pairs.forEach { (surface, beforeFrame, afterFrame) ->
+                val faultText = if (afterFrame.defects.isEmpty()) {
+                    "No faults detected on this surface at move-out."
+                } else {
+                    "Fault(s): " + afterFrame.defects.joinToString("; ") { it.describeFault() }
+                }
+                cursor.breakPageIfBelow(report, thumbHeight + 70)
+                cursor.canvas.drawText(surface, MARGIN.toFloat(), cursor.y, labelPaint)
+                cursor.y += 12
+
+                val top = cursor.y.toInt()
+                val leftRect = android.graphics.Rect(MARGIN, top, MARGIN + thumbWidth, top + thumbHeight)
+                val rightRect = android.graphics.Rect(
+                    MARGIN + thumbWidth + 12, top, MARGIN + thumbWidth + 12 + thumbWidth, top + thumbHeight
+                )
+                cursor.canvas.drawBitmap(beforeFrame.bitmap, null, leftRect, null)
+                cursor.canvas.drawBitmap(afterFrame.bitmap, null, rightRect, null)
+                cursor.y += thumbHeight + 12
+                cursor.canvas.drawText("Move-in", leftRect.left.toFloat(), cursor.y, captionPaint)
+                cursor.canvas.drawText("Move-out", rightRect.left.toFloat(), cursor.y, captionPaint)
+                cursor.y += 14
+                cursor.drawWrapped(faultText, faultPaint, gap = 10)
+            }
+        }
+        cursor.y += 8
     }
 
     /**

@@ -72,30 +72,36 @@ class ReportRepository:
 
     def insert_report(self, record: ReportRecord) -> ReportRecord:
         with self._lock:
-            self._connection.execute(
-                """
-                INSERT INTO reports (
-                    report_id, property_ref, session_type, created_at_epoch_ms,
-                    digest_sha256, app_version, findings_count, deposit_rupees,
-                    total_deduction_rupees, server_received_at_epoch_ms,
-                    access_token_sha256
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    record.report_id,
-                    record.property_ref,
-                    record.session_type,
-                    record.created_at_epoch_ms,
-                    record.digest_sha256,
-                    record.app_version,
-                    record.findings_count,
-                    record.deposit_rupees,
-                    record.total_deduction_rupees,
-                    record.server_received_at_epoch_ms,
-                    record.access_token_sha256,
-                ),
-            )
-            self._connection.commit()
+            try:
+                self._connection.execute(
+                    """
+                    INSERT INTO reports (
+                        report_id, property_ref, session_type, created_at_epoch_ms,
+                        digest_sha256, app_version, findings_count, deposit_rupees,
+                        total_deduction_rupees, server_received_at_epoch_ms,
+                        access_token_sha256
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        record.report_id,
+                        record.property_ref,
+                        record.session_type,
+                        record.created_at_epoch_ms,
+                        record.digest_sha256,
+                        record.app_version,
+                        record.findings_count,
+                        record.deposit_rupees,
+                        record.total_deduction_rupees,
+                        record.server_received_at_epoch_ms,
+                        record.access_token_sha256,
+                    ),
+                )
+                self._connection.commit()
+            except sqlite3.IntegrityError:
+                # A failed SQLite statement leaves the transaction open.  Roll it back
+                # before the route re-reads the row that won a concurrent insert.
+                self._connection.rollback()
+                raise
         return record
 
     def get_report(self, report_id: str) -> ReportRecord | None:

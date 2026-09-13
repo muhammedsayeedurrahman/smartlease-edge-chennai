@@ -13,7 +13,7 @@ import androidx.room.RoomDatabase
         AreaEntity::class,
         RentalAgreementEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 @androidx.room.TypeConverters(Converters::class)
@@ -34,8 +34,11 @@ abstract class AppDatabase : RoomDatabase() {
                 )
                     // v1 -> v2 added sessionType/propertyLabel (move-in/move-out baseline
                     // diffing). v2 -> v3 added the countersignatures table (QR joint-inspection
-                    // handshake). No migration path exists yet for whatever test rows are on a
-                    // device from before this change -- there is no real tenant data at stake
+                    // handshake). v5 -> v6 added RentalAgreementEntity.dosAndDontsSource, so a
+                    // report can print an honest "written by Gemma" vs "raw extracted text"
+                    // credit for the lease summary, the same way every other report section
+                    // already does. No migration path exists yet for whatever test rows are on
+                    // a device from before this change -- there is no real tenant data at stake
                     // this early, so this drops old rows rather than leaving the app unable
                     // to open its own database on next launch.
                     .fallbackToDestructiveMigration(dropAllTables = true)

@@ -1,0 +1,170 @@
+[
+ {
+  "path": "data/samples/ComplexDataLab_OpenFake/fake\\fake_0000.jpg",
+  "label": "fake",
+  "risk": 0.067,
+  "verdict": "AUTHENTIC",
+  "ms": 63411
+ },
+ {
+  "path": "data/samples/ComplexDataLab_OpenFake/fake\\fake_0001.jpg",
+  "label": "fake",
+  "risk": 0.015,
+  "verdict": "AUTHENTIC",
+  "ms": 7735
+ },
+ {
+  "path": "data/samples/ComplexDataLab_OpenFake/fake\\fake_0002.jpg",
+  "label": "fake",
+  "risk": 0.131,
+  "verdict": "AUTHENTIC",
+  "ms": 5583
+ },
+ {
+  "path": "data/samples/ComplexDataLab_OpenFake/fake\\fake_0003.jpg",
+  "label": "fake",
+  "risk": 0.033,
+  "verdict": "AUTHENTIC",
+  "ms": 5434
+ },
+ {
+  "path": "data/samples/ComplexDataLab_OpenFake/fake\\fake_0004.jpg",
+  "label": "fake",
+  "risk": 0.362,
+  "verdict": "AUTHENTIC",
+  "ms": 5071
+ },
+ {
+  "path": "data/samples/ComplexDataLab_OpenFake/fake\\fake_0005.jpg",
+  "label": "fake",
+  "risk": 0.092,
+  "verdict": "AUTHENTIC",
+  "ms": 5404
+ },
+ {
+  "path": "data/samples/ComplexDataLab_OpenFake/fake\\fake_0006.jpg",
+  "label": "fake",
+  "risk": 0.522,
+  "verdict": "AUTHENTIC",
+  "ms": 5234
+ },
+ {
+  "path": "data/samples/ComplexDataLab_OpenFake/fake\\fake_0007.jpg",
+  "label": "fake",
+  "risk": 0.147,
+  "verdict": "AUTHENTIC",
+  "ms": 5497
+ },
+ {
+  "path": "data/samples/ComplexDataLab_OpenFake/fake\\fake_0008.jpg",
+  "label": "fake",
+  "risk": 0.019,
+  "verdict": "AUTHENTIC",
+  "ms": 5378
+ },
+ {
+  "path": "data/samples/ComplexDataLab_OpenFake/fake\\fake_0009.jpg",
+  "label": "fake",
+  "risk": 0.154,
+  "verdict": "AUTHENTIC",
+  "ms": 6529
+ },
+ {
+  "path": "data/samples/ComplexDataLab_OpenFake/fake\\fake_0010.jpg",
+  "label": "fake",
+  "risk": 0.047,
+  "verdict": "AUTHENTIC",
+  "ms": 5416
+ },
+ {
+  "path": "data/samples/ComplexDataLab_OpenFake/fake\\fake_0011.jpg",
+  "label": "fake",
+  "risk": 0.243,
+  "verdict": "AUTHENTIC",
+  "ms": 5064
+ },
+ {
+  "path": "data/samples/ComplexDataLab_OpenFake/real\\real_0000.jpg",
+  "label": "real",
+  "risk": 0.142,
+  "verdict": "AUTHENTIC",
+  "ms": 5226
+ },
+ {
+  "path": "data/samples/ComplexDataLab_OpenFake/real\\real_0001.jpg",
+  "label": "real",
+  "risk": 0.1,
+  "verdict": "AUTHENTIC",
+  "ms": 5976
+ },
+ {
+  "path": "data/samples/ComplexDataLab_OpenFake/real\\real_0002.jpg",
+  "label": "real",
+  "risk": 0.032,
+  "verdict": "AUTHENTIC",
+  "ms": 10082
+ },
+ {
+  "path": "data/samples/ComplexDataLab_OpenFake/real\\real_0003.jpg",
+  "label": "real",
+  "risk": 0.002,
+  "verdict": "AUTHENTIC",
+  "ms": 8343
+ },
+ {
+  "path": "data/samples/ComplexDataLab_OpenFake/real\\real_0004.jpg",
+  "label": "real",
+  "risk": 0.016,
+  "verdict": "AUTHENTIC",
+  "ms": 5760
+ },
+ {
+  "path": "data/samples/ComplexDataLab_OpenFake/real\\real_0005.jpg",
+  "label": "real",
+  "risk": 0.235,
+  "verdict": "AUTHENTIC",
+  "ms": 6402
+ },
+ {
+  "path": "data/samples/ComplexDataLab_OpenFake/real\\real_0006.jpg",
+  "label": "real",
+  "risk": 0.032,
+  "verdict": "AUTHENTIC",
+  "ms": 6370
+ },
+ {
+  "path": "data/samples/ComplexDataLab_OpenFake/real\\real_0007.jpg",
+  "label": "real",
+  "risk": 0.033,
+  "verdict": "AUTHENTIC",
+  "ms": 5568
+ },
+ {
+  "path": "data/samples/ComplexDataLab_OpenFake/real\\real_0008.jpg",
+  "label": "real",
+  "risk": 0.712,
+  "verdict": "AI-GENERATED",
+  "ms": 8243
+ },
+ {
+  "path": "data/samples/ComplexDataLab_OpenFake/real\\real_0009.jpg",
+  "label": "real",
+  "risk": 0.244,
+  "verdict": "AUTHENTIC",
+  "ms": 5818
+ },
+ {
+  "path": "data/samples/ComplexDataLab_OpenFake/real\\real_0010.jpg",
+  "label": "real",
+  "risk": 0.023,
+  "verdict": "AUTHENTIC",
+  "ms": 5736
+ },
+ {
+  "path": "data/samples/ComplexDataLab_OpenFake/real\\real_0011.jpg",
+  "label": "real",
+  "risk": 0.013,
+  "verdict": "AUTHENTIC",
+  "ms": 7815
+ }
+]

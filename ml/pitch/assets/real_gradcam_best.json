@@ -1,0 +1,17 @@
+{
+ "path": "data/samples/ComplexDataLab_OpenFake/fake\\fake_0006.jpg",
+ "fast_risk": 0.522,
+ "ensemble_risk": 0.40355311547566225,
+ "verdict": "AUTHENTIC",
+ "model_agreement": "3/7 models detect manipulation",
+ "model_scores": {
+  "vit": 0.8063299059867859,
+  "texture": 0.1768937110900879,
+  "frequency": 0.5909031629562378,
+  "dino": 0.23216630518436432,
+  "efficientnet": 0.3393592834472656,
+  "face": 0.7801638245582581,
+  "clip": 0.1708984375,
+  "forensic": 0.3310737285836238
+ }
+}

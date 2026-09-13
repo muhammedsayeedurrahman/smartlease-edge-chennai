@@ -36,7 +36,8 @@ fun HomeScreen(
     viewModel: AppViewModel,
     onCreateProperty: (isFlat: Boolean) -> Unit,
     onPropertySelected: (String) -> Unit,
-    onOpenSelfTest: () -> Unit
+    onOpenSelfTest: () -> Unit,
+    onOpenJudgeDemo: () -> Unit
 ) {
     val properties = viewModel.properties
 
@@ -70,6 +71,9 @@ fun HomeScreen(
             TopAppBar(
                 title = { Text("SmartLease", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground) },
                 actions = {
+                    TextButton(onClick = onOpenJudgeDemo) {
+                        Text("Demo")
+                    }
                     // Diagnostics has to be reachable from the first screen, with no
                     // property and no session: the questions it answers ("did the model
                     // load?", "is narration rule-based on this phone?") are exactly the

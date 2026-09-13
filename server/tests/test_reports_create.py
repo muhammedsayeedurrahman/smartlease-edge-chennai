@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import sqlite3
+
 from tests.conftest import API, digest_for, report_payload
 
 
@@ -40,6 +42,26 @@ def test_duplicate_post_with_different_digest_is_a_tamper_signal(client):
     assert response.status_code == 409
     body = response.json()
     assert body["error"]["code"] == "digest_mismatch"
+
+
+def test_racing_duplicate_create_is_idempotent_instead_of_a_500(client, monkeypatch):
+    """A row inserted after the route's first read must be treated as a retry."""
+    payload = report_payload()
+    repository = client.app.state.report_repository
+    original_insert = repository.insert_report
+
+    def concurrent_winner(record):
+        original_insert(record)
+        raise sqlite3.IntegrityError("UNIQUE constraint failed: reports.report_id")
+
+    monkeypatch.setattr(repository, "insert_report", concurrent_winner)
+
+    response = client.post(f"{API}/reports", json=payload)
+
+    assert response.status_code == 200
+    assert response.json()["reportId"] == payload["reportId"]
+    assert response.json()["digestSha256"] == payload["digestSha256"]
+    assert response.json()["reportToken"] is None
 
 
 def test_deduction_exceeding_deposit_is_rejected(client):

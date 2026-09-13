@@ -1,0 +1,19 @@
+{
+ "path": "data/samples/Hemg_deepfake_and_real_images\\fake\\fake_0005.jpg",
+ "fast_risk": 0.947,
+ "ensemble_risk": 0.6476247433224748,
+ "verdict": "AI-GENERATED",
+ "confidence": "MEDIUM",
+ "model_agreement": "3/7 models detect manipulation",
+ "model_scores": {
+  "vit": 0.3896001875400543,
+  "texture": 0.3770045042037964,
+  "frequency": 0.5534274578094482,
+  "dino": 0.4168546497821808,
+  "efficientnet": 0.4912416338920593,
+  "face": 0.5917150378227234,
+  "clip": 0.5859375,
+  "forensic": 0.006659000515937805
+ },
+ "wall_s": 25.0
+}

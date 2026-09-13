@@ -11,6 +11,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -48,7 +50,14 @@ fun PropertyDashboardScreen(
     val rooms = viewModel.getRoomsForProperty(propertyId)
     val capturedDefectCount = rooms.sumOf { room -> room.moveInFrames.sumOf { it.defects.size } + room.moveOutFrames.sumOf { it.defects.size } }
     var askingSessionType by remember { mutableStateOf(false) }
-    var isMoveOutMode by remember { mutableStateOf(false) }
+    // Seeded from persisted frames, not just false: this screen is recreated every time
+    // navigation returns to it (e.g. after recording a surface), so a plain `false` default
+    // would silently drop the tenant back into "Complete Move-In & Start Move-Out" even
+    // though move-out recording had already started -- indistinguishable from move-out
+    // "not working" from the outside.
+    var isMoveOutMode by remember(propertyId) {
+        mutableStateOf(rooms.any { it.moveOutFrames.isNotEmpty() })
+    }
     
     val sessionTypeString = if (isMoveOutMode) "MOVE_OUT" else "MOVE_IN"
 
@@ -66,11 +75,15 @@ fun PropertyDashboardScreen(
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
     var isDocumentUploaded by remember { mutableStateOf(false) }
+    var isAnalyzingDocument by remember { mutableStateOf(false) }
+    var showSummaryDialog by remember { mutableStateOf(false) }
+    var agreement by remember { mutableStateOf<com.smartlease.edge.data.RentalAgreementEntity?>(null) }
 
     LaunchedEffect(propertyId) {
         val db = com.smartlease.edge.data.AppDatabase.get(context)
-        val agreement = db.propertyDao().getRentalAgreementForProperty(propertyId)
-        if (agreement != null) {
+        val loaded = db.propertyDao().getRentalAgreementForProperty(propertyId)
+        if (loaded != null) {
+            agreement = loaded
             isDocumentUploaded = true
         }
     }
@@ -79,18 +92,34 @@ fun PropertyDashboardScreen(
         contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
     ) { uri ->
         if (uri != null) {
-            scope.launch {
-                val db = com.smartlease.edge.data.AppDatabase.get(context)
-                val newId = UUID.randomUUID().toString()
-                db.propertyDao().insertRentalAgreement(
-                    com.smartlease.edge.data.RentalAgreementEntity(
-                        id = newId,
-                        propertyId = propertyId,
-                        pdfFilePath = uri.toString(),
-                        dosAndDontsSummary = "Generated Summary (Placeholder)"
-                    )
+            // A picker URI grant is otherwise one-shot; persisting it is what lets the
+            // eye icon still open the PDF (and lets re-analysis still read it) after this
+            // screen is recreated by navigation or the app is restarted.
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
                 )
+            } catch (_: SecurityException) {
+                // Some providers don't grant persistable access; the summary/view still
+                // works for this session, so this is not fatal.
+            }
+            scope.launch {
+                isAnalyzingDocument = true
+                val summary = com.smartlease.edge.domain.llm.DocumentAnalyzer(context)
+                    .extractDosAndDonts(uri.toString())
+                val db = com.smartlease.edge.data.AppDatabase.get(context)
+                val newAgreement = com.smartlease.edge.data.RentalAgreementEntity(
+                    id = UUID.randomUUID().toString(),
+                    propertyId = propertyId,
+                    pdfFilePath = uri.toString(),
+                    dosAndDontsSummary = summary.text,
+                    dosAndDontsSource = summary.source.name
+                )
+                db.propertyDao().insertRentalAgreement(newAgreement)
+                agreement = newAgreement
                 isDocumentUploaded = true
+                isAnalyzingDocument = false
             }
         }
     }
@@ -158,8 +187,37 @@ fun PropertyDashboardScreen(
                         Text("Add Document", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
                         Text("Completed", color = com.smartlease.edge.ui.theme.LampGreen, style = MaterialTheme.typography.bodySmall)
                     }
-                    IconButton(onClick = { android.widget.Toast.makeText(context, "Document Summary Placeholder", android.widget.Toast.LENGTH_SHORT).show() }) {
-                        Icon(Icons.Rounded.Download, contentDescription = "View Summary", tint = com.smartlease.edge.ui.theme.CorporateYellow)
+                    Row {
+                        IconButton(onClick = {
+                            val path = agreement?.pdfFilePath
+                            if (path != null) {
+                                try {
+                                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                                        setDataAndType(android.net.Uri.parse(path), "application/pdf")
+                                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    }
+                                    context.startActivity(intent)
+                                } catch (e: android.content.ActivityNotFoundException) {
+                                    Toast.makeText(context, "No app found to open PDF", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }) {
+                            Icon(Icons.Rounded.Visibility, contentDescription = "View Document", tint = com.smartlease.edge.ui.theme.CorporateYellow)
+                        }
+                        IconButton(onClick = { showSummaryDialog = true }) {
+                            Icon(Icons.Rounded.Description, contentDescription = "View Summary", tint = com.smartlease.edge.ui.theme.CorporateYellow)
+                        }
+                    }
+                } else if (isAnalyzingDocument) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = com.smartlease.edge.ui.theme.CorporateYellow
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("Analyzing document with on-device AI…", color = MaterialTheme.colorScheme.onBackground)
                     }
                 } else {
                     Button(
@@ -173,6 +231,37 @@ fun PropertyDashboardScreen(
                 }
             }
             Spacer(modifier = Modifier.height(24.dp))
+
+            if (showSummaryDialog) {
+                val credit = when (agreement?.dosAndDontsSource) {
+                    "GEMMA" -> "Written by the on-device Gemma model from this lease's text."
+                    else -> "On-device AI summary unavailable for this document -- showing extracted lease text."
+                }
+                AlertDialog(
+                    onDismissRequest = { showSummaryDialog = false },
+                    title = { Text("Lease Dos & Don'ts") },
+                    text = {
+                        Column(
+                            modifier = Modifier
+                                .heightIn(max = 400.dp)
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            Text(
+                                text = agreement?.dosAndDontsSummary ?: "No summary available.",
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = credit,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { showSummaryDialog = false }) { Text("Close") }
+                    }
+                )
+            }
             
             Text("Existing Areas", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
             Spacer(modifier = Modifier.height(16.dp))

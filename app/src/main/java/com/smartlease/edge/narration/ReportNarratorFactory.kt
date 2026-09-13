@@ -12,10 +12,17 @@ import android.util.Log
  * itself ("this report was written by an on-device model") tied to a file that either exists
  * and loaded, or does not.
  *
+<<<<<<< HEAD
  * With dual-runtime support (MediaPipe tasks-genai for .task, LiteRT GenAI for .litertlm)
  * and [ModelLoadBalancer], the factory checks available RAM and thermals before attempting
  * to load weights, dynamically scaling the token budget or skipping gracefully to rule-based
  * templating if memory is insufficient.
+=======
+ * Before loading, [ModelLoadBalancer] checks available RAM and thermal state so that
+ * attempting to load a multi-gigabyte model does not get the process killed by Android's Low
+ * Memory Killer -- it either scales the token budget down or skips straight to
+ * [TemplateReportNarrator] with an honest reason.
+>>>>>>> origin/master
  */
 object ReportNarratorFactory {
 
@@ -52,10 +59,15 @@ object ReportNarratorFactory {
 
             is GemmaModelLocator.Location.Found -> {
                 val availMb = ModelLoadBalancer.getAvailableMemoryBytes(context) / (1024 * 1024)
+<<<<<<< HEAD
                 val modelMb = location.file.length() / (1024 * 1024)
                 val format = if (location.isLiteRtLm) "LiteRT-LM" else "MediaPipe .task"
                 "Gemma model found ($format) - ${location.file.name} " +
                     "(${modelMb} MB, ${availMb} MB RAM free), loaded at report time"
+=======
+                "Gemma model found - ${location.file.name} " +
+                    "(${location.file.length() / (1024 * 1024)} MB, ${availMb} MB RAM free), loaded at report time"
+>>>>>>> origin/master
             }
         }
 
@@ -84,14 +96,8 @@ object ReportNarratorFactory {
                     )
                 } else {
                     val maxTokens = decision.recommendedMaxTokens
-                    val narrator = if (location.isLiteRtLm) {
-                        LiteRtReportNarrator.tryCreate(context, location.file, maxTokens)
-                            ?: GemmaReportNarrator.tryCreate(context, location.file, maxTokens)
-                    } else {
-                        GemmaReportNarrator.tryCreate(context, location.file, maxTokens)
-                    }
-
-                    if (narrator == null) {
+                    val gemma = GemmaReportNarrator.tryCreate(context, location.file, maxTokens)
+                    if (gemma == null) {
                         // Found but unusable is a distinct state from absent, and worth saying so:
                         // it is the difference between "you have not set this up" and "you set it
                         // up and it is broken", which need different things from the user.
@@ -105,7 +111,7 @@ object ReportNarratorFactory {
                         val label = if (location.isLiteRtLm) "on-device Gemma (LiteRT)" else "on-device Gemma"
                         val budgetNote = if (decision is ModelLoadBalancer.LoadDecision.Tight) " [budget: ${maxTokens}t]" else ""
                         Selection(
-                            narrator = narrator,
+                            narrator = gemma,
                             status = "$label - ${location.file.name} (${megabytes} MB)$budgetNote",
                             usingModel = true
                         )
