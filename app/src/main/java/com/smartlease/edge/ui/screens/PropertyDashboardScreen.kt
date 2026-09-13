@@ -1,5 +1,10 @@
 package com.smartlease.edge.ui.screens
 
+import kotlinx.coroutines.launch
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -36,13 +41,16 @@ fun PropertyDashboardScreen(
     viewModel: AppViewModel,
     propertyId: String,
     onBack: () -> Unit,
-    onRoomSelected: (String) -> Unit,
+    onRoomSelected: (String, String) -> Unit,
     onGenerateReport: (SessionType) -> Unit = {}
 ) {
     val property = viewModel.properties.find { it.id == propertyId }
     val rooms = viewModel.getRoomsForProperty(propertyId)
-    val capturedDefectCount = rooms.sumOf { room -> room.frames.sumOf { it.defects.size } }
+    val capturedDefectCount = rooms.sumOf { room -> room.moveInFrames.sumOf { it.defects.size } + room.moveOutFrames.sumOf { it.defects.size } }
     var askingSessionType by remember { mutableStateOf(false) }
+    var isMoveOutMode by remember { mutableStateOf(false) }
+    
+    val sessionTypeString = if (isMoveOutMode) "MOVE_OUT" else "MOVE_IN"
 
     val roomCategories = listOf(
         "Hall" to Icons.Rounded.Weekend,
@@ -51,8 +59,41 @@ fun PropertyDashboardScreen(
         "Bathroom" to Icons.Rounded.Bathtub,
         "Balcony" to Icons.Rounded.Deck,
         "Garden" to Icons.Rounded.Yard,
-        "Outer" to Icons.Rounded.Fence
+        "Outer" to Icons.Rounded.Fence,
+        "Custom" to Icons.Rounded.AddBox
     )
+
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    var isDocumentUploaded by remember { mutableStateOf(false) }
+
+    LaunchedEffect(propertyId) {
+        val db = com.smartlease.edge.data.AppDatabase.get(context)
+        val agreement = db.propertyDao().getRentalAgreementForProperty(propertyId)
+        if (agreement != null) {
+            isDocumentUploaded = true
+        }
+    }
+
+    val documentPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val db = com.smartlease.edge.data.AppDatabase.get(context)
+                val newId = UUID.randomUUID().toString()
+                db.propertyDao().insertRentalAgreement(
+                    com.smartlease.edge.data.RentalAgreementEntity(
+                        id = newId,
+                        propertyId = propertyId,
+                        pdfFilePath = uri.toString(),
+                        dosAndDontsSummary = "Generated Summary (Placeholder)"
+                    )
+                )
+                isDocumentUploaded = true
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -63,6 +104,7 @@ fun PropertyDashboardScreen(
                         Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
                     }
                 },
+                actions = {},
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
                     titleContentColor = MaterialTheme.colorScheme.onBackground,
@@ -80,29 +122,57 @@ fun PropertyDashboardScreen(
         ) {
             Spacer(modifier = Modifier.height(16.dp))
             
-            Text("Add New Area", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
-            Spacer(modifier = Modifier.height(16.dp))
+            if (!isMoveOutMode) {
+                Text("Add New Area", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(4),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth().height(180.dp)
+                ) {
+                    items(roomCategories) { (title, icon) ->
+                        RoomCategoryIcon(title = title, icon = icon) {
+                            val newRoom = Room(
+                                id = UUID.randomUUID().toString(),
+                                propertyId = propertyId,
+                                type = title
+                            )
+                            viewModel.addRoom(newRoom)
+                            onRoomSelected(newRoom.id, sessionTypeString)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(32.dp))
+            }
             
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(4),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxWidth().height(180.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                items(roomCategories) { (title, icon) ->
-                    RoomCategoryIcon(title = title, icon = icon) {
-                        val newRoom = Room(
-                            id = UUID.randomUUID().toString(),
-                            propertyId = propertyId,
-                            type = title
-                        )
-                        viewModel.addRoom(newRoom)
-                        onRoomSelected(newRoom.id)
+                if (isDocumentUploaded) {
+                    Column {
+                        Text("Add Document", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
+                        Text("Completed", color = com.smartlease.edge.ui.theme.LampGreen, style = MaterialTheme.typography.bodySmall)
+                    }
+                    IconButton(onClick = { android.widget.Toast.makeText(context, "Document Summary Placeholder", android.widget.Toast.LENGTH_SHORT).show() }) {
+                        Icon(Icons.Rounded.Download, contentDescription = "View Summary", tint = com.smartlease.edge.ui.theme.CorporateYellow)
+                    }
+                } else {
+                    Button(
+                        onClick = { documentPickerLauncher.launch("application/pdf") },
+                        colors = ButtonDefaults.buttonColors(containerColor = com.smartlease.edge.ui.theme.CarbonBlack, contentColor = Color.White),
+                        border = BorderStroke(1.dp, com.smartlease.edge.ui.theme.CorporateYellow),
+                        modifier = Modifier.fillMaxWidth().height(48.dp)
+                    ) {
+                        Text("Add Document", fontWeight = FontWeight.Bold)
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(24.dp))
             
             Text("Existing Areas", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
             Spacer(modifier = Modifier.height(16.dp))
@@ -117,32 +187,46 @@ fun PropertyDashboardScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(rooms) { room ->
-                        RoomListItem(room = room, onClick = { onRoomSelected(room.id) })
+                        RoomListItem(
+                            room = room, 
+                            sessionType = sessionTypeString,
+                            onClick = { onRoomSelected(room.id, sessionTypeString) },
+                            onDelete = { viewModel.deleteRoom(room.id) }
+                        )
                     }
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
-                // Without this the capture flow had no exit: areas could be recorded
-                // indefinitely and nothing ever produced the report, PDF, digest, or
-                // countersignature the whole product exists to produce.
+                
+                val isMoveInComplete = rooms.isNotEmpty() && rooms.all { it.topRecorded && it.bottomRecorded && it.sidesRecorded }
+                val isMoveOutComplete = rooms.isNotEmpty() && rooms.all { it.topMoveOutRecorded && it.bottomMoveOutRecorded && it.sidesMoveOutRecorded }
+
+                val buttonText = when {
+                    isMoveOutMode && isMoveOutComplete -> "Generate Report"
+                    isMoveOutMode -> "Recording Move-Out"
+                    isMoveInComplete -> "Complete Move-In & Start Move-Out"
+                    else -> "Complete Move-In First"
+                }
+
                 Button(
-                    onClick = { askingSessionType = true },
-                    enabled = capturedDefectCount > 0,
+                    onClick = { 
+                        if (isMoveOutMode && isMoveOutComplete) {
+                            onGenerateReport(SessionType.MOVE_OUT)
+                        } else if (isMoveInComplete && !isMoveOutMode) {
+                            isMoveOutMode = true
+                        }
+                    },
+                    enabled = isMoveInComplete,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Generate report")
+                    Text(buttonText)
                 }
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     if (capturedDefectCount > 0) {
-                        "$capturedDefectCount finding(s) across ${rooms.size} area(s) will be " +
-                            "written up, priced against the deposit, and digest-stamped."
+                        "Workflow State: ${if (isMoveInComplete) "Move-In Complete. Ready for Move-Out." else "Recording Move-In phase."}"
                     } else {
-                        // Stating the actual precondition beats a disabled button with no
-                        // explanation -- and it must not imply the areas were inspected and
-                        // found clean, only that nothing has been detected yet.
-                        "Record an area first. A report is only produced once the camera has " +
-                            "flagged at least one defect -- nothing here is written up by hand."
+                        "Record an area first to establish the Move-In baseline."
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -208,8 +292,12 @@ fun RoomCategoryIcon(title: String, icon: ImageVector, onClick: () -> Unit) {
 }
 
 @Composable
-fun RoomListItem(room: Room, onClick: () -> Unit) {
-    val isComplete = room.topRecorded && room.bottomRecorded && room.sidesRecorded
+fun RoomListItem(room: Room, sessionType: String, onClick: () -> Unit, onDelete: () -> Unit) {
+    val isComplete = if (sessionType == "MOVE_OUT") {
+        room.topMoveOutRecorded && room.bottomMoveOutRecorded && room.sidesMoveOutRecorded
+    } else {
+        room.topRecorded && room.bottomRecorded && room.sidesRecorded
+    }
     
     ElevatedCard(
         modifier = Modifier
@@ -227,9 +315,10 @@ fun RoomListItem(room: Room, onClick: () -> Unit) {
                 Text(room.type, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
                 val details = buildList {
                     if (room.sqFt.isNotEmpty()) add("${room.sqFt} sq ft")
-                    if (room.frames.isNotEmpty()) {
-                        add("${room.frames.size} frames")
-                        val totalDefects = room.frames.sumOf { it.defects.size }
+                    val frames = if (sessionType == "MOVE_OUT") room.moveOutFrames else room.moveInFrames
+                    if (frames.isNotEmpty()) {
+                        add("${frames.size} frames")
+                        val totalDefects = frames.sumOf { it.defects.size }
                         if (totalDefects > 0) add("$totalDefects defects")
                     }
                 }.joinToString(" • ")
@@ -254,6 +343,15 @@ fun RoomListItem(room: Room, onClick: () -> Unit) {
                 ) {
                     Text("In Progress", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall)
                 }
+            }
+            
+            Spacer(modifier = Modifier.width(12.dp))
+            IconButton(onClick = onDelete) {
+                Icon(
+                    imageVector = Icons.Rounded.Delete,
+                    contentDescription = "Delete",
+                    tint = MaterialTheme.colorScheme.error
+                )
             }
         }
     }

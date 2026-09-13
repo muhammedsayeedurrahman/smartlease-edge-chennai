@@ -84,6 +84,31 @@ android {
         // .ptl model files are already compressed archives; letting aapt re-compress them
         // breaks LiteModuleLoader's ability to mmap them straight out of the APK.
         noCompress += "ptl"
+        noCompress += "litertlm"
+    }
+}
+
+// The LiteRT-LM AAR is built against Kotlin 2.4.0 and needs `kotlin-stdlib:2.4.0` (and its
+// `kotlin-reflect:2.4.0`) at RUNTIME: the reflect artifact references
+// `kotlin.jvm.internal.KotlinGenericDeclaration`, a class that exists ONLY in the 2.4.0 stdlib
+// (verified: absent in 2.3.0, present in 2.4.0). Forcing the stdlib down to an older version
+// -- an earlier attempt here -- compiled fine but crashed at model load with
+// NoClassDefFoundError for that class. So we align UP: let the whole graph use the 2.4.0
+// Kotlin runtime, and rely on `-Xskip-metadata-version-check` below so this project's Kotlin
+// 2.1.0 compiler tolerates reading the newer 2.4.0 library metadata. A full toolchain bump to
+// Kotlin 2.4 is the tidier fix, but KSP (which Room needs) has no 2.4.0 release yet, so that
+// path is blocked; pinning the runtime libraries up is the change that actually works today.
+configurations.all {
+    resolutionStrategy {
+        force("org.jetbrains.kotlin:kotlin-stdlib:2.4.0")
+        force("org.jetbrains.kotlin:kotlin-stdlib-common:2.4.0")
+        force("org.jetbrains.kotlin:kotlin-reflect:2.4.0")
+    }
+}
+
+kotlin {
+    compilerOptions {
+        freeCompilerArgs.add("-Xskip-metadata-version-check")
     }
 }
 
@@ -117,6 +142,12 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
+    implementation(libs.sqlcipher)
+    implementation(libs.androidx.sqlite.ktx)
+
+    implementation(libs.arcore)
+    implementation(libs.sceneview)
+    implementation(libs.arsceneview)
 
     // On-device inference for the team's trained .ptl models
     implementation(libs.pytorch.android.lite)
@@ -127,7 +158,10 @@ dependencies {
     // The app builds, installs and produces reports with no model file present; narration
     // falls back to rule-based templating and says so on the page.
     implementation(libs.mediapipe.tasks.genai)
-
+    // LiteRT-LM runtime: loads the .litertlm container (Gemma 4 / Gemma 3n) that the MediaPipe
+    // runtime above cannot read. Same "weights are not in the APK" guarantee -- runtime only.
+    // Its Kotlin 2.4.0 stdlib/reflect are aligned up by the resolutionStrategy above.
+    implementation(libs.litertlm.android)
 
     // Backend sync client (com.smartlease.edge.sync) -- uploads a digest + metadata only.
     implementation(libs.retrofit.core)
@@ -144,4 +178,6 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+    implementation("com.itextpdf:itextg:5.5.10")
+    implementation("com.google.code.gson:gson:2.10.1")
 }

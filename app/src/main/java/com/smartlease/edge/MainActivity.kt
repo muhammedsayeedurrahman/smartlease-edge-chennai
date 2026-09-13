@@ -153,8 +153,8 @@ fun SmartLeaseApp(
                 viewModel = viewModel,
                 propertyId = propertyId,
                 onBack = { navController.popBackStack("home", inclusive = false) },
-                onRoomSelected = { roomId ->
-                    navController.navigate("room_config/$roomId")
+                onRoomSelected = { roomId, sessionType ->
+                    navController.navigate("room_config/$roomId/$sessionType")
                 },
                 onGenerateReport = { sessionType ->
                     val property = viewModel.properties.find { it.id == propertyId }
@@ -225,33 +225,40 @@ fun SmartLeaseApp(
             )
         }
         composable(
-            route = "room_config/{roomId}",
-            arguments = listOf(navArgument("roomId") { type = NavType.StringType })
+            route = "room_config/{roomId}/{sessionType}",
+            arguments = listOf(
+                navArgument("roomId") { type = NavType.StringType },
+                navArgument("sessionType") { type = NavType.StringType }
+            )
         ) { backStackEntry ->
             val roomId = backStackEntry.arguments?.getString("roomId") ?: return@composable
+            val sessionType = backStackEntry.arguments?.getString("sessionType") ?: "MOVE_IN"
             RoomConfigScreen(
                 viewModel = viewModel,
                 roomId = roomId,
+                sessionType = sessionType,
                 onBack = { navController.popBackStack() },
-                onRecordSurface = { rid, surfaceType ->
-                    navController.navigate("video_capture/$rid/$surfaceType")
+                onRecordSurface = { rid, surfaceType, sType ->
+                    navController.navigate("video_capture/$rid/$surfaceType/$sType")
                 }
             )
         }
         composable(
-            route = "video_capture/{roomId}/{surfaceType}",
+            route = "video_capture/{roomId}/{surfaceType}/{sessionType}",
             arguments = listOf(
                 navArgument("roomId") { type = NavType.StringType },
-                navArgument("surfaceType") { type = NavType.StringType }
+                navArgument("surfaceType") { type = NavType.StringType },
+                navArgument("sessionType") { type = NavType.StringType }
             )
         ) { backStackEntry ->
             val roomId = backStackEntry.arguments?.getString("roomId") ?: return@composable
             val surfaceType = backStackEntry.arguments?.getString("surfaceType") ?: return@composable
-            
+            val sessionType = backStackEntry.arguments?.getString("sessionType") ?: "MOVE_IN"
             VideoCaptureScreen(
                 viewModel = viewModel,
                 roomId = roomId,
                 surfaceType = surfaceType,
+                sessionType = sessionType,
                 onExit = { navController.popBackStack() },
                 onAddAnotherRoom = {
                     val room = viewModel.rooms.find { it.id == roomId }

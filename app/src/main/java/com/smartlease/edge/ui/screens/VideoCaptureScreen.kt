@@ -28,6 +28,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -64,6 +65,7 @@ fun VideoCaptureScreen(
     viewModel: AppViewModel,
     roomId: String,
     surfaceType: String,
+    sessionType: String,
     onExit: () -> Unit,
     onAddAnotherRoom: () -> Unit
 ) {
@@ -148,10 +150,19 @@ fun VideoCaptureScreen(
                                 // be reading it elsewhere in this same frame) once the scaled
                                 // copy exists.
                                 val thumbnail = downscaleForThumbnail(bitmap)
+                                // Save frame to disk
+                                val property = viewModel.properties.find { it.id == room.propertyId }
+                                val propertyName = property?.name ?: "UnknownProperty"
+                                val storageHelper = com.smartlease.edge.data.local.MediaStorageHelper(context)
+                                val filePath = storageHelper.saveFrameToPersistentStorage(
+                                    thumbnail, propertyName, room.type, surfaceType, capturedFrames.size + 1
+                                )
+                                
                                 val newFrame = CapturedFrame(
                                     surfaceType = surfaceType,
                                     frameIndex = capturedFrames.size + 1,
                                     bitmap = thumbnail,
+                                    filePath = filePath,
                                     defects = defects,
                                     sharpness = sharpness,
                                     isTrainedModel = segmenter.isTrainedModel
@@ -450,13 +461,13 @@ fun VideoCaptureScreen(
                                     
                                     // Update room status
                                     val updatedRoom = when (surfaceType) {
-                                        "Top" -> room.copy(topRecorded = true)
-                                        "Bottom" -> room.copy(bottomRecorded = true)
-                                        "Sides" -> room.copy(sidesRecorded = true)
+                                        "Top" -> if (sessionType == "MOVE_OUT") room.copy(topMoveOutRecorded = true) else room.copy(topRecorded = true)
+                                        "Bottom" -> if (sessionType == "MOVE_OUT") room.copy(bottomMoveOutRecorded = true) else room.copy(bottomRecorded = true)
+                                        "Sides" -> if (sessionType == "MOVE_OUT") room.copy(sidesMoveOutRecorded = true) else room.copy(sidesRecorded = true)
                                         else -> room
                                     }
                                     viewModel.updateRoom(updatedRoom)
-                                    viewModel.addFramesToRoom(roomId, capturedFrames.toList())
+                                    viewModel.addFramesToRoom(roomId, sessionType, capturedFrames.toList())
                                 }
                             },
                         contentAlignment = Alignment.Center
@@ -470,204 +481,218 @@ fun VideoCaptureScreen(
                 }
             }
         } else {
-            // Finished Recording Review & Converted Frames Gallery Overlay
-            Column(
+            InspectionCompleteOverlay(
+                surfaceType = surfaceType,
+                capturedFrames = capturedFrames.toList(),
+                onExit = onExit
+            )
+        }
+    }
+}
+
+@Composable
+fun InspectionCompleteOverlay(
+    surfaceType: String,
+    capturedFrames: List<CapturedFrame>,
+    onExit: () -> Unit
+) {
+    var selectedFrameIndex by remember { mutableIntStateOf(0) }
+    
+    // Finished Recording Review & Converted Frames Gallery Overlay
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .fillMaxHeight(0.88f)
+            .padding(16.dp)
+            .background(com.smartlease.edge.ui.theme.SurfaceUnified.copy(alpha = 0.96f), RoundedCornerShape(24.dp))
+            .border(1.dp, com.smartlease.edge.ui.theme.BorderUnified, RoundedCornerShape(24.dp))
+            .padding(20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Header
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "$surfaceType Inspection Complete",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Text(
+                    text = "${capturedFrames.size} frames converted & analyzed",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = com.smartlease.edge.ui.theme.TextSecondaryUnified
+                )
+            }
+            val totalDefects = capturedFrames.sumOf { it.defects.size }
+            Box(
                 modifier = Modifier
-                    .align(Alignment.Center)
-                    .fillMaxWidth()
-                    .fillMaxHeight(0.88f)
-                    .padding(16.dp)
-                    .background(com.smartlease.edge.ui.theme.SurfaceUnified.copy(alpha = 0.96f), RoundedCornerShape(24.dp))
-                    .border(1.dp, com.smartlease.edge.ui.theme.BorderUnified, RoundedCornerShape(24.dp))
-                    .padding(20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .background(
+                        if (totalDefects > 0) com.smartlease.edge.ui.theme.LampAmber.copy(alpha = 0.2f)
+                        else com.smartlease.edge.ui.theme.LampGreen.copy(alpha = 0.2f),
+                        RoundedCornerShape(8.dp)
+                    )
+                    .padding(horizontal = 10.dp, vertical = 4.dp)
             ) {
-                // Header
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                Text(
+                    text = if (totalDefects > 0) "$totalDefects Defect(s) Found" else "✓ Clean Surface",
+                    color = if (totalDefects > 0) com.smartlease.edge.ui.theme.LampAmber else com.smartlease.edge.ui.theme.LampGreen,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        if (capturedFrames.isNotEmpty()) {
+            val safeIndex = selectedFrameIndex.coerceIn(0, capturedFrames.size - 1)
+            val activeFrame = capturedFrames[safeIndex]
+
+            // Active Frame Full Preview
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .border(1.dp, com.smartlease.edge.ui.theme.BorderUnified, RoundedCornerShape(16.dp))
+                    .background(Color.Black),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    bitmap = activeFrame.bitmap.asImageBitmap(),
+                    contentDescription = "Selected Frame",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize().rotate(90f)
+                )
+                // Frame tag
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(8.dp)
+                        .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
-                    Column {
-                        Text(
-                            text = "$surfaceType Inspection Complete",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                        Text(
-                            text = "${capturedFrames.size} frames converted & analyzed",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = com.smartlease.edge.ui.theme.TextSecondaryUnified
-                        )
-                    }
-                    val totalDefects = capturedFrames.sumOf { it.defects.size }
-                    Box(
-                        modifier = Modifier
-                            .background(
-                                if (totalDefects > 0) com.smartlease.edge.ui.theme.LampAmber.copy(alpha = 0.2f)
-                                else com.smartlease.edge.ui.theme.LampGreen.copy(alpha = 0.2f),
-                                RoundedCornerShape(8.dp)
-                            )
-                            .padding(horizontal = 10.dp, vertical = 4.dp)
-                    ) {
-                        Text(
-                            text = if (totalDefects > 0) "$totalDefects Defect(s) Found" else "✓ Clean Surface",
-                            color = if (totalDefects > 0) com.smartlease.edge.ui.theme.LampAmber else com.smartlease.edge.ui.theme.LampGreen,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                if (capturedFrames.isNotEmpty()) {
-                    val safeIndex = selectedFrameIndex.coerceIn(0, capturedFrames.size - 1)
-                    val activeFrame = capturedFrames[safeIndex]
-
-                    // Active Frame Full Preview
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(200.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .border(1.dp, com.smartlease.edge.ui.theme.BorderUnified, RoundedCornerShape(16.dp))
-                            .background(Color.Black),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Image(
-                            bitmap = activeFrame.bitmap.asImageBitmap(),
-                            contentDescription = "Selected Frame",
-                            contentScale = ContentScale.Fit,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                        // Frame tag
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.TopStart)
-                                .padding(8.dp)
-                                .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(6.dp))
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = "Frame #${safeIndex + 1} of ${capturedFrames.size}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color.White
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Filmstrip Frame Selector
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        itemsIndexed(capturedFrames) { idx, frame ->
-                            val isSelected = idx == safeIndex
-                            Box(
-                                modifier = Modifier
-                                    .size(54.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .border(
-                                        width = if (isSelected) 2.dp else 1.dp,
-                                        color = if (isSelected) com.smartlease.edge.ui.theme.CorporateYellow else com.smartlease.edge.ui.theme.BorderUnified,
-                                        shape = RoundedCornerShape(10.dp)
-                                    )
-                                    .clickable { selectedFrameIndex = idx }
-                            ) {
-                                Image(
-                                    bitmap = frame.bitmap.asImageBitmap(),
-                                    contentDescription = "Thumb $idx",
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Defect & Quality Details for Selected Frame
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                            .background(com.smartlease.edge.ui.theme.CarbonBlack, RoundedCornerShape(12.dp))
-                            .border(1.dp, com.smartlease.edge.ui.theme.BorderUnified, RoundedCornerShape(12.dp))
-                            .padding(12.dp)
-                            .verticalScroll(rememberScrollState())
-                    ) {
-                        if (activeFrame.defects.isEmpty()) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Rounded.CheckCircle, contentDescription = "Clean", tint = com.smartlease.edge.ui.theme.LampGreen, modifier = Modifier.size(20.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    "No defects detected on this frame",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = com.smartlease.edge.ui.theme.LampGreen,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                            Text(
-                                "Surface is uniform, solid, and meets quality baseline.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = com.smartlease.edge.ui.theme.TextSecondaryUnified,
-                                modifier = Modifier.padding(top = 4.dp)
-                            )
-                        } else {
-                            activeFrame.defects.forEachIndexed { dIdx, defect ->
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(bottom = 6.dp)
-                                ) {
-                                    Icon(Icons.Rounded.Warning, contentDescription = "Defect", tint = com.smartlease.edge.ui.theme.LampAmber, modifier = Modifier.size(18.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Column {
-                                        Text(
-                                            text = defect.label,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = Color.White,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Text(
-                                            text = "Class: ${defect.defectClass} • Est: ${String.format("%.2f", defect.areaSqFtEstimate)} sq ft • Conf: ${String.format("%.0f%%", defect.confidence * 100)}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = com.smartlease.edge.ui.theme.TextSecondaryUnified
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Action Buttons
-                Button(
-                    onClick = onExit,
-                    colors = ButtonDefaults.buttonColors(containerColor = com.smartlease.edge.ui.theme.CorporateYellow, contentColor = Color.Black),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth().height(48.dp)
-                ) {
-                    Text("Return to Room Config", fontWeight = FontWeight.Bold)
-                }
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                OutlinedButton(
-                    onClick = onAddAnotherRoom,
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                    border = BorderStroke(1.dp, com.smartlease.edge.ui.theme.BorderUnified),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth().height(48.dp)
-                ) {
-                    Text("Add Another Room", fontWeight = FontWeight.Bold)
+                    Text(
+                        text = "Frame #${safeIndex + 1} of ${capturedFrames.size}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White
+                    )
                 }
             }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Filmstrip Frame Selector
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                itemsIndexed(capturedFrames) { idx, frame ->
+                    val isSelected = idx == safeIndex
+                    Box(
+                        modifier = Modifier
+                            .size(54.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .border(
+                                width = if (isSelected) 2.dp else 1.dp,
+                                color = if (isSelected) com.smartlease.edge.ui.theme.CorporateYellow else com.smartlease.edge.ui.theme.BorderUnified,
+                                shape = RoundedCornerShape(10.dp)
+                            )
+                            .clickable { selectedFrameIndex = idx }
+                    ) {
+                        Image(
+                            bitmap = frame.bitmap.asImageBitmap(),
+                            contentDescription = "Thumb $idx",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize().rotate(90f)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Defect & Quality Details for Selected Frame
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .background(com.smartlease.edge.ui.theme.CarbonBlack, RoundedCornerShape(12.dp))
+                    .border(1.dp, com.smartlease.edge.ui.theme.BorderUnified, RoundedCornerShape(12.dp))
+                    .padding(12.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                if (activeFrame.defects.isEmpty()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Rounded.CheckCircle, contentDescription = "Clean", tint = com.smartlease.edge.ui.theme.LampGreen, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            "No defects detected on this frame",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = com.smartlease.edge.ui.theme.LampGreen,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    Text(
+                        "Surface is uniform, solid, and meets quality baseline.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = com.smartlease.edge.ui.theme.TextSecondaryUnified,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                } else {
+                    activeFrame.defects.forEachIndexed { dIdx, defect ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(bottom = 6.dp)
+                        ) {
+                            Icon(Icons.Rounded.Warning, contentDescription = "Defect", tint = com.smartlease.edge.ui.theme.LampAmber, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Column {
+                                Text(
+                                    text = defect.label,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "Class: ${defect.defectClass} • Est: ${String.format("%.2f", defect.areaSqFtEstimate)} sq ft • Conf: ${String.format("%.0f%%", defect.confidence * 100)}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = com.smartlease.edge.ui.theme.TextSecondaryUnified
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Action Buttons
+        Button(
+            onClick = onExit,
+            colors = ButtonDefaults.buttonColors(containerColor = com.smartlease.edge.ui.theme.CorporateYellow, contentColor = Color.Black),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth().height(48.dp)
+        ) {
+            Text("Return to Room Config", fontWeight = FontWeight.Bold)
+        }
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        OutlinedButton(
+            onClick = onExit,
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+            border = BorderStroke(1.dp, com.smartlease.edge.ui.theme.BorderUnified),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth().height(48.dp)
+        ) {
+            Text("Save img & video", fontWeight = FontWeight.Bold)
         }
     }
 }

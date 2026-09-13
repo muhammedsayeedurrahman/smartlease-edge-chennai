@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -42,6 +44,12 @@ import com.smartlease.edge.BuildConfig
 import com.smartlease.edge.deduction.DeductionEngine
 import com.smartlease.edge.deduction.DeductionLine
 import com.smartlease.edge.deduction.DeductionSummary
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Warning
+import androidx.compose.material.icons.rounded.AutoAwesome
 import com.smartlease.edge.report.FindingsDigest
 import com.smartlease.edge.report.InspectionReport
 import com.smartlease.edge.report.QrCode
@@ -235,16 +243,29 @@ fun ReportScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             items(report.sections) { section ->
-                Panel(Modifier.fillMaxWidth()) {
-                    Column {
-                        Text(
-                            // Stored as SCREAMING_SNAKE enum names; read back as prose.
-                            section.title.lowercase(Locale.getDefault())
-                                .replaceFirstChar { it.titlecase(Locale.getDefault()) },
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(Modifier.height(6.dp))
+                ElevatedCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            androidx.compose.material3.Icon(
+                                imageVector = if (section.title == "Dos & Don'ts") Icons.Rounded.AutoAwesome else if (section.body.contains("defect", ignoreCase = true) || section.title.contains("ATTENTION")) Icons.Rounded.Warning else Icons.Rounded.CheckCircle,
+                                contentDescription = null,
+                                tint = if (section.title == "Dos & Don'ts") MaterialTheme.colorScheme.primary else if (section.body.contains("defect", ignoreCase = true) || section.title.contains("ATTENTION")) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(Modifier.size(8.dp))
+                            Text(
+                                // Stored as SCREAMING_SNAKE enum names; read back as prose.
+                                section.title.lowercase(Locale.getDefault())
+                                    .replaceFirstChar { it.titlecase(Locale.getDefault()) },
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        Spacer(Modifier.height(8.dp))
                         Text(
                             section.body,
                             style = MaterialTheme.typography.bodyMedium,
@@ -267,8 +288,12 @@ fun ReportScreen(
                 }
 
                 Spacer(Modifier.height(6.dp))
-                Panel(Modifier.fillMaxWidth()) {
-                    Column {
+                ElevatedCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(Modifier.padding(16.dp)) {
                         Text(
                             "SHA-256 of ${report.findingCount} finding(s)",
                             style = MaterialTheme.typography.titleMedium,
@@ -365,8 +390,12 @@ fun ReportScreen(
  */
 @Composable
 private fun DepositBalanceSheet(deductions: DeductionSummary) {
-    Panel(Modifier.fillMaxWidth()) {
-        Column {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(Modifier.padding(16.dp)) {
             Text(
                 "Deposit balance sheet",
                 style = MaterialTheme.typography.titleMedium,

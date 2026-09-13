@@ -7,7 +7,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+import kotlinx.coroutines.withContext
 import com.smartlease.edge.vision.DefectSegmenter
 import com.smartlease.edge.vision.DefectSegmenterFactory
 import com.smartlease.edge.vision.HeuristicDefectSegmenter
@@ -27,6 +29,7 @@ data class CapturedFrame(
     val frameIndex: Int,
     val timestampMs: Long = System.currentTimeMillis(),
     val bitmap: Bitmap,
+    val filePath: String? = null,
     val defects: List<DefectSegmenter.Defect> = emptyList(),
     val sharpness: Double = 0.0,
     // No default: overclaiming a trained model is a correctness bug in this project, so
@@ -55,7 +58,11 @@ data class Room(
     val topRecorded: Boolean = false,
     val bottomRecorded: Boolean = false,
     val sidesRecorded: Boolean = false,
-    val frames: List<CapturedFrame> = emptyList()
+    val moveInFrames: List<CapturedFrame> = emptyList(),
+    val topMoveOutRecorded: Boolean = false,
+    val bottomMoveOutRecorded: Boolean = false,
+    val sidesMoveOutRecorded: Boolean = false,
+    val moveOutFrames: List<CapturedFrame> = emptyList()
 )
 
 /**
@@ -68,13 +75,68 @@ sealed interface SegmenterState {
     data class Ready(val segmenter: DefectSegmenter) : SegmenterState
 }
 
-class AppViewModel : ViewModel() {
+class AppViewModel(application: Application) : AndroidViewModel(application) {
     val properties = mutableStateListOf<Property>()
     val rooms = mutableStateListOf<Room>()
+
+    private val dao = com.smartlease.edge.data.AppDatabase.get(application).propertyDao()
 
     // Off-main-thread home for the one-time vision-model bring-up. Cancelled in onCleared()
     // so no load work outlives this ViewModel.
     private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    init {
+        
+        // Load properties and rooms from the database
+        backgroundScope.launch {
+            val dbProperties = dao.getAllProperties()
+            val mappedProps = dbProperties.map {
+                Property(it.id, it.name, it.address, it.tenantName, it.depositAmount.toString(), it.isFlat)
+            }
+            
+            val allRooms = mutableListOf<Room>()
+            for (p in dbProperties) {
+                val dbRooms = dao.getAreasForProperty(p.id)
+                allRooms.addAll(dbRooms.map {
+                    val sqFtStr = if (it.height != null && it.height > 0.0) {
+                        String.format("%.2f", it.length * it.breadth * it.height)
+                    } else if (it.length > 0.0 && it.breadth > 0.0) {
+                        String.format("%.2f", it.length * it.breadth)
+                    } else {
+                        ""
+                    }
+                    val mInFrames = it.moveInFrames
+                    val mOutFrames = it.moveOutFrames
+                    
+                    Room(
+                        id = it.id, 
+                        propertyId = it.propertyId, 
+                        type = it.name, 
+                        sqFt = sqFtStr,
+                        length = if (it.length > 0.0) it.length.toString() else "", 
+                        width = if (it.breadth > 0.0) it.breadth.toString() else "", 
+                        height = if (it.height != null && it.height > 0.0) it.height.toString() else "",
+                        moveInFrames = mInFrames,
+                        moveOutFrames = mOutFrames,
+                        topRecorded = mInFrames.any { f -> f.surfaceType == "Top" },
+                        bottomRecorded = mInFrames.any { f -> f.surfaceType == "Bottom" },
+                        sidesRecorded = mInFrames.any { f -> f.surfaceType == "Sides" },
+                        topMoveOutRecorded = mOutFrames.any { f -> f.surfaceType == "Top" },
+                        bottomMoveOutRecorded = mOutFrames.any { f -> f.surfaceType == "Bottom" },
+                        sidesMoveOutRecorded = mOutFrames.any { f -> f.surfaceType == "Sides" }
+                    )
+                })
+            }
+            withContext(Dispatchers.Main) {
+                properties.clear()
+                properties.addAll(mappedProps)
+                rooms.clear()
+                rooms.addAll(allRooms)
+            }
+        }
+    }
+
+
 
     var segmenterState: SegmenterState by mutableStateOf(SegmenterState.Loading)
         private set
@@ -116,30 +178,84 @@ class AppViewModel : ViewModel() {
 
     fun addProperty(property: Property) {
         properties.add(property)
+        backgroundScope.launch {
+            dao.insertProperty(com.smartlease.edge.data.PropertyEntity(
+                id = property.id,
+                name = property.name,
+                address = property.location,
+                tenantName = property.tenantName,
+                depositAmount = property.depositAmount.toDoubleOrNull() ?: 0.0,
+                isFlat = property.isFlat
+            ))
+        }
     }
 
     fun addRoom(room: Room) {
         rooms.add(room)
+        backgroundScope.launch {
+            dao.insertArea(com.smartlease.edge.data.AreaEntity(
+                id = room.id,
+                propertyId = room.propertyId,
+                name = room.type,
+                length = room.length.toDoubleOrNull() ?: 0.0,
+                breadth = room.width.toDoubleOrNull() ?: 0.0,
+                height = room.height.toDoubleOrNull(),
+                moveInFrames = room.moveInFrames,
+                moveOutFrames = room.moveOutFrames
+            ))
+        }
     }
 
     fun updateRoom(updatedRoom: Room) {
         val index = rooms.indexOfFirst { it.id == updatedRoom.id }
         if (index != -1) {
             rooms[index] = updatedRoom
+            backgroundScope.launch {
+                dao.insertArea(com.smartlease.edge.data.AreaEntity(
+                    id = updatedRoom.id,
+                    propertyId = updatedRoom.propertyId,
+                    name = updatedRoom.type,
+                    length = updatedRoom.length.toDoubleOrNull() ?: 0.0,
+                    breadth = updatedRoom.width.toDoubleOrNull() ?: 0.0,
+                    height = updatedRoom.height.toDoubleOrNull(),
+                    moveInFrames = updatedRoom.moveInFrames,
+                    moveOutFrames = updatedRoom.moveOutFrames
+                ))
+            }
         }
     }
     
-    fun addFramesToRoom(roomId: String, newFrames: List<CapturedFrame>) {
+    fun addFramesToRoom(roomId: String, sessionType: String, newFrames: List<CapturedFrame>) {
         val index = rooms.indexOfFirst { it.id == roomId }
         if (index != -1) {
             val existing = rooms[index]
-            val updatedFrames = existing.frames + newFrames
-            rooms[index] = existing.copy(frames = updatedFrames)
+            val updated = if (sessionType == "MOVE_OUT") {
+                existing.copy(moveOutFrames = existing.moveOutFrames + newFrames)
+            } else {
+                existing.copy(moveInFrames = existing.moveInFrames + newFrames)
+            }
+            // Use updateRoom to persist it
+            updateRoom(updated)
         }
     }
     
     fun getRoomsForProperty(propertyId: String): List<Room> {
         return rooms.filter { it.propertyId == propertyId }
+    }
+
+    fun deleteProperty(propertyId: String) {
+        properties.removeAll { it.id == propertyId }
+        rooms.removeAll { it.propertyId == propertyId }
+        backgroundScope.launch {
+            dao.deleteProperty(propertyId)
+        }
+    }
+
+    fun deleteRoom(roomId: String) {
+        rooms.removeAll { it.id == roomId }
+        backgroundScope.launch {
+            dao.deleteArea(roomId)
+        }
     }
 }
 

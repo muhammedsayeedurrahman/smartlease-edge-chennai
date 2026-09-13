@@ -11,24 +11,64 @@ a download.
 
 ## Runtime compatibility (read this first)
 
-This app loads models through **MediaPipe `tasks-genai`**, pinned at `0.10.35` in
-`gradle/libs.versions.toml`. That runtime reads the **`.task`** container.
+**Gemma 4 now runs.** The app loads `.litertlm` weights through Google's **LiteRT-LM** runtime
+(`com.google.ai.edge.litertlm:litertlm-android`, pinned in `gradle/libs.versions.toml`). Gemma 4
+is published as the `.litertlm` container, and LiteRT-LM is the runtime that reads it.
 
-Gemma 4 is published almost exclusively as **`.litertlm`** — the LiteRT-LM container. The two
-are *not* interchangeable, and `.litertlm` is not simply a newer `.task` that an upgrade picks
-up:
+> Older note, kept for history: the app used to load models only through MediaPipe `tasks-genai`
+> `0.10.35`, which reads the `.task` container and **rejects** `.litertlm` at tokenizer-init with
+> a SentencePiece parse error (`sentencepiece_processor.cc(264) ParseFromString`). That runtime
+> is still in the build for `.task` models, but narration now goes through LiteRT-LM, so a Gemma 4
+> `.litertlm` loads instead of falling back to templating.
 
-- `0.10.35` is the **latest** `tasks-genai` on Google's Maven — 18 versions published, and
-  nothing newer exists. There is no version bump that adds Gemma 4 support.
-- LiteRT-LM is not published as a drop-in Android Maven artifact the way `tasks-genai` is, so
-  "just swap the runtime" is a dependency-architecture change, not a one-line fix.
+### This was tested. It loads and narrates.
 
-`GemmaModelLocator` *accepts* the `.litertlm` extension, so a Gemma 4 file will be **found** and
-may then **fail to load**. Those are different states and the app reports them differently — see
-[Step 4](#4-confirm-what-the-app-actually-did).
+Clean-installed on the demo phone (iQOO 15, SM8850), with a `.litertlm` model pushed byte-exact,
+the LiteRT-LM path loads on the **GPU backend** and narrates end to end:
 
-**The honest expectation:** pushing Gemma 4 to the phone is an experiment worth running, but
-"failed to load" is the likely result, and it is not a bug in the push.
+```
+LOCATE: found <model>.litertlm
+GemmaNarrator: Loaded <model>.litertlm on GPU
+LOAD:   usingModel=true
+LOAD:   status=on-device Gemma - <model>.litertlm (N MB)
+GENERATE: source=GEMMA
+AUDIT:  Accepted
+RESULT: MODEL NARRATED
+```
+
+Reproduce with `GemmaLoadDeviceTest`:
+
+```bash
+adb shell am instrument -w \
+  -e class com.smartlease.edge.narration.GemmaLoadDeviceTest \
+  com.smartlease.edge.test/androidx.test.runner.AndroidJUnitRunner
+adb logcat -d | grep -E "GemmaLoadTest|GemmaNarrator"
+```
+
+### If you build the app yourself: two gotchas we hit
+
+LiteRT-LM `0.17.0` is compiled against Kotlin **2.4.0** and needs `kotlin-stdlib:2.4.0` +
+`kotlin-reflect:2.4.0` **at runtime** — the reflect artifact references
+`kotlin.jvm.internal.KotlinGenericDeclaration`, a class that exists only in the 2.4.0 stdlib.
+This project's Kotlin compiler is older, so:
+
+1. `app/build.gradle.kts` **forces the Kotlin runtime libraries up to 2.4.0** (not down) and sets
+   `-Xskip-metadata-version-check`. Forcing the stdlib *down* compiles fine but crashes at model
+   load with `NoClassDefFoundError: kotlin.jvm.internal.KotlinGenericDeclaration`. This is already
+   configured in the repo; do not undo it.
+2. **Do a full uninstall + clean install when you change the runtime**, not an incremental
+   install. An incremental install can leave stale dex on the device, so the app runs old code and
+   crashes with the class-not-found error even though the fresh APK contains the class:
+   ```bash
+   adb uninstall com.smartlease.edge.test
+   adb uninstall com.smartlease.edge
+   ./gradlew :app:installDebug :app:installDebugAndroidTest
+   ```
+   Note that uninstalling **also deletes the model** from the app's external dir, so re-push it
+   (Step 3) after a clean install.
+
+Just installing the pre-built APK to *use* the app needs neither of these — they only matter when
+you compile.
 
 ---
 
@@ -49,8 +89,8 @@ Variant suffixes:
 
 - **no suffix** (`gemma-4-E4B-it.litertlm`) — the general build. Use this one.
 - **`-gpu`** — GPU-delegate build.
-- **`-web`** — WASM/browser build. `gemma-4-E4B-it-web.task` is a `.task` file, which looks
-  tempting given the note above, but it targets the web runtime, not Android.
+- **`-web`** — WASM/browser build (e.g. `gemma-4-E4B-it-web.task`). Targets the web runtime, not
+  Android — do not use it here. On device it is rejected with `Unable to open zip archive`.
 - **`_qualcomm_sm8750`, `_Google_Tensor_G5`, `_intel_LNL`** — NPU builds compiled for one exact
   SoC. The demo phone is **SM8850**; an `sm8750` build is a *different* chip and will not load.
 
@@ -104,6 +144,14 @@ and fails in a way that looks like a runtime problem:
 ls -l ~/gemma4/gemma-4-E4B-it.litertlm    # expect ~3.7 GB, not ~200 bytes
 ```
 
+The first bytes of a real file are the ASCII marker `LITERTLM`; a stub is text starting with
+`version https://git-lfs...`. If you only got a stub, delete it and re-run the download.
+
+> **It downloads slowly on an unauthenticated connection** (HF rate-limits anonymous pulls, and
+> a 3.66 GB file can take 30+ minutes). `hf download` resumes if interrupted — just re-run the
+> same command and it picks up where it stopped. A HF token (`hf auth login`) makes it faster,
+> but the `litert-community` repos need no token to access.
+
 ## 3. Push it to the phone
 
 ```bash
@@ -155,7 +203,7 @@ Open the app, tap **ⓘ** on the home screen to reach **Device & Model Check**, 
 |---|---|---|
 | `on-device Gemma - <file> (N MB)` | Loaded. Narration is running on the model. | Nothing. Generate a report. |
 | `rule-based templating - no model file in ...` | The push did not land where the app looks. | Re-check the destination path in Step 3. |
-| `rule-based templating - <file> (N MB) failed to load` | Found, but the runtime refused it. | Expected for `.litertlm`. See below. |
+| `rule-based templating - <file> (N MB) failed to load` | Found, but the runtime refused it. | Truncated push, a `-web`/wrong-SoC build, or (if you built the app) the stale-dex issue in the Runtime section. |
 
 "Not set up" and "set up and broken" need different things from you, which is why the app
 distinguishes them rather than printing one vague failure.
@@ -164,8 +212,11 @@ For the real cause of a load failure:
 
 ```bash
 adb logcat -c    # clear, then reproduce by generating a report
-adb logcat -d | grep -iE "llm_inference|mediapipe|litert|GemmaNarrator|NarratorFactory"
+adb logcat -d | grep -iE "litert|GemmaNarrator|NarratorFactory|KotlinGenericDeclaration"
 ```
+
+A successful load logs `GemmaNarrator: Loaded <file> on GPU` (or `on CPU`). `KotlinGenericDeclaration`
+in the trace means the stale-dex / Kotlin-version issue — see the Runtime section above.
 
 ## 5. Measure what it costs
 

@@ -21,7 +21,10 @@ androidxJunit = "1.3.0"
 # On-device report narration. The weights are NOT in the APK -- see docs/GEMMA_SETUP.md;
 # this is the runtime only, and the app runs correctly with no model present.
 mediapipeGenai = "0.10.35"
-
+# LiteRT-LM runtime: loads the .litertlm container (Gemma 4 / Gemma 3n), which the MediaPipe
+# tasks-genai runtime above cannot read. Google's official on-device LLM runtime, published on
+# Google Maven. See docs/GEMMA4_SETUP.md.
+litertlm = "0.17.0"
 
 # Backend sync: uploads a signed findings digest + metadata only (never media bytes).
 retrofit = "2.11.0"
@@ -44,6 +47,7 @@ kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
 mediapipe-tasks-genai = { group = "com.google.mediapipe", name = "tasks-genai", version.ref = "mediapipeGenai" }
+litertlm-android = { group = "com.google.ai.edge.litertlm", name = "litertlm-android", version.ref = "litertlm" }
 androidx-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
 
 androidx-camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "camerax" }
@@ -68,10 +72,14 @@ pytorch-torchvision-lite = { group = "org.pytorch", name = "pytorch_android_torc
 androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
-
+sqlcipher = { group = "net.zetetic", name = "android-database-sqlcipher", version = "4.5.4" }
+androidx-sqlite-ktx = { group = "androidx.sqlite", name = "sqlite-ktx", version = "2.4.0" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxJunit" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
+arcore = { group = "com.google.ar", name = "core", version = "1.41.0" }
+sceneview = { group = "io.github.sceneview", name = "sceneview", version = "2.1.1" }
+arsceneview = { group = "io.github.sceneview", name = "arsceneview", version = "2.1.1" }
 
 # Backend sync client (com.smartlease.edge.sync). Server stores only a digest + metadata --
 # this stack never carries a bitmap/byte-array field, by construction of the DTOs.

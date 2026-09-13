@@ -6,12 +6,20 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [InspectionEntity::class, CountersignatureEntity::class],
-    version = 3,
+    entities = [
+        InspectionEntity::class, 
+        CountersignatureEntity::class,
+        PropertyEntity::class,
+        AreaEntity::class,
+        RentalAgreementEntity::class
+    ],
+    version = 5,
     exportSchema = false
 )
+@androidx.room.TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun inspectionDao(): InspectionDao
+    abstract fun propertyDao(): PropertyDao
 
     companion object {
         @Volatile private var instance: AppDatabase? = null

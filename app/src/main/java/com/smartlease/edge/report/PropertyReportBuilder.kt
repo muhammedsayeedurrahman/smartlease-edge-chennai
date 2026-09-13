@@ -51,7 +51,8 @@ object PropertyReportBuilder {
     ): List<InspectionEntity> = rooms
         .filter { it.propertyId == property.id }
         .flatMap { room ->
-            room.frames.flatMap { frame ->
+            val frames = if (sessionType == SessionType.MOVE_OUT) room.moveOutFrames else room.moveInFrames
+            frames.flatMap { frame ->
                 frame.defects.map { defect ->
                     // "Hall -- Sides: crack" reads as a location in a document, which is what
                     // a report is. The defect class stays a separate structured field so the
